@@ -1,40 +1,45 @@
 -- modules/export.lua
 local Export = {}
 
--- Configurable heartbeat interval
-Export.INTERVAL = 600 -- ticks between exports (~10 seconds)
+-- Configurable heartbeat interval (ticks between exports)
+Export.INTERVAL = 600 -- 600 ticks = ~10 seconds
 
 local Util = require("__my-export-mod__/modules/util")
 local Chat = require("__my-export-mod__/modules/chat")
 
 function Export.on_tick(event)
-    -- first, prune any stale chat entries
-    Chat.prune(event.tick)
+    local tick      = event.tick
+    local game_time = Util.tick_to_time(tick)
 
-    -- compute top-level elapsed time
-    local game_time = Util.tick_to_time(event.tick)
+    -- Prune stale chat entries before exporting
+    Chat.prune(tick)
 
-    -- gather state
-    local players, forces, surfaces = game.connected_players, game.forces, game.surfaces
+    -- Grab the main surface
+    local surface = game.surfaces["nauvis"]
 
-    -- build player list
-    local player_names = {}
-    for _, p in pairs(players) do table.insert(player_names, p.name) end
+    -- Evolution factor of the alien force (defaults to “nauvis”)
+    local evolution = game.forces["enemy"].get_evolution_factor(surface)
 
-    -- gather force research info
-    local forces_info = {}
-    for _, f in pairs(forces) do
-        local q = f.research_queue or {}
-        forces_info[f.name] = { current = q[1], queued = #q }
-    end
+    -- Pollution at the origin chunk on nauvis
+    local pollution = surface.get_pollution({ 0, 0 })
 
-    -- gather surface pollution
-    local pollution = {}
-    for sname, surf in pairs(surfaces) do
-        pollution[sname] = surf.get_pollution({ 0, 0 })
-    end
+    -- Count of alien spawners on nauvis
+    local spawner_count = surface.count_entities_filtered {
+        type  = "unit-spawner",
+        force = "enemy"
+    }
 
-    -- build chat output (sans raw tick)
+    -- Count all player turrets by type: bullet, laser, flame, artillery
+    local turret_count =
+        surface.count_entities_filtered { type = "ammo-turret", force = "player" } +
+        surface.count_entities_filtered { type = "electric-turret", force = "player" } +
+        surface.count_entities_filtered { type = "fluid-turret", force = "player" } +
+        surface.count_entities_filtered { type = "artillery-turret", force = "player" }
+
+    -- Number of technologies the player has queued
+    local research_queue_length = #game.forces["player"].research_queue
+
+    -- Build trimmed chat array (omit raw tick)
     local chat_out = {}
     for _, msg in ipairs(storage.chat_messages or {}) do
         table.insert(chat_out, {
@@ -44,20 +49,19 @@ function Export.on_tick(event)
         })
     end
 
-    -- assemble full export
+    -- Assemble export table
     local data        = {
-        tick           = event.tick,
-        game_time      = game_time,
-        total_players  = #players,
-        total_forces   = #forces,
-        total_surfaces = #surfaces,
-        player_names   = player_names,
-        forces         = forces_info,
-        pollution      = pollution,
-        chat           = chat_out
+        tick                  = tick,
+        game_time             = game_time,
+        evolution_factor      = evolution,
+        pollution             = pollution,
+        spawner_count         = spawner_count,
+        turret_count          = turret_count,
+        research_queue_length = research_queue_length,
+        chat                  = chat_out
     }
 
-    -- serialize & write out
+    -- Serialize, pretty-print, and write out
     local json_min    = helpers.table_to_json(data)
     local json_pretty = Util.pretty_json(json_min)
     helpers.write_file("export.json", json_pretty, false)
