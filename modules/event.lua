@@ -3,38 +3,71 @@ local Event           = {}
 
 -- Configurable retention settings
 Event.RETENTION_TICKS = 60 * 60 -- ~1 minute
-Event.MAX_EVENTS      = 5
+Event.MAX_GROUPS      = 5 -- Now we limit by group, not individual event
 
 local Util            = require("__my-export-mod__/modules/util")
 
 function Event.init()
-    storage.events = {}
+    storage.event_groups = {}
+end
+
+-- Helper: returns a grouping key for an event
+local group_key = function(event_type, event_data)
+    -- Group by type and cause (for deaths), or by type and surface/position (for attacks)
+    if event_type == "unit-died" or event_type == "player-died" then
+        return event_type .. "|" .. (event_data.player or event_data.unit or "unknown") .. "|" .. (event_data.cause or "unknown")
+    elseif event_type == "enemy-attack" then
+        return event_type .. "|" .. (event_data.surface or "unknown") .. "|" .. (event_data.position and (event_data.position.x .. "," .. event_data.position.y) or "unknown")
+    else
+        return event_type
+    end
 end
 
 function Event.record(event_type, event_data)
-    storage.events = storage.events or {}
-    local events = storage.events
-    table.insert(events, {
-        tick      = game.tick,
-        game_time = Util.tick_to_time(game.tick),
+    storage.event_groups = storage.event_groups or {}
+    local groups = storage.event_groups
+    local tick = game.tick
+    local gkey = group_key(event_type, event_data)
+    if not groups[gkey] then
+        groups[gkey] = {
+            type = event_type,
+            key = gkey,
+            first_tick = tick,
+            last_tick = tick,
+            events = {}
+        }
+    end
+    local group = groups[gkey]
+    group.last_tick = tick
+    table.insert(group.events, {
+        tick      = tick,
+        game_time = Util.tick_to_time(tick),
         type      = event_type,
         data      = event_data
     })
-    Event.prune(game.tick)
 end
 
 function Event.prune(current_tick)
-    storage.events = storage.events or {}
-    local events = storage.events
+    storage.event_groups = storage.event_groups or {}
+    local groups = storage.event_groups
     local cutoff = current_tick - Event.RETENTION_TICKS
-    local i = 1
-    while i <= #events and events[i].tick < cutoff do
-        table.remove(events, i)
+    -- Remove groups by age ONLY
+    for key, group in pairs(groups) do
+        if group.last_tick < cutoff then
+            groups[key] = nil
+        end
     end
-    while #events > Event.MAX_EVENTS do
-        table.remove(events, 1)
+    -- Remove oldest groups if over limit
+    local group_list = {}
+    for key, group in pairs(groups) do
+        table.insert(group_list, group)
     end
-    storage.events = events
+    table.sort(group_list, function(a, b) return a.first_tick < b.first_tick end)
+    while #group_list > Event.MAX_GROUPS do
+        groups[group_list[1].key] = nil
+        table.remove(group_list, 1)
+    end
+    storage.event_groups = groups
 end
 
 -- Handler for enemy-attack
@@ -75,6 +108,16 @@ function Event.on_player_died(event)
         cause_force = (cause and cause.force) and cause.force.name or nil,
         surface     = player.surface and player.surface.name or nil
     })
+end
+
+-- Helper to get all groups
+function Event.get_groups()
+    storage.event_groups = storage.event_groups or {}
+    local out = {}
+    for _, group in pairs(storage.event_groups) do
+        table.insert(out, group)
+    end
+    return out
 end
 
 -- Register events

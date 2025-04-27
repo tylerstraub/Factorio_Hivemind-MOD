@@ -9,38 +9,37 @@ local Chat      = require("__my-export-mod__/modules/chat")
 local Event     = require("__my-export-mod__/modules/event")
 
 -- Summarize unit-died / player-died and collect enemy-attack events
-local function summarize_events(raw_events)
+local function summarize_event_groups(groups)
     local losses = { player = {}, enemy = {} }
     local attacks = {}
 
-    for _, ev in ipairs(raw_events) do
-        if ev.type == "unit-died" or ev.type == "player-died" then
-            local is_player = (ev.type == "player-died")
+    for _, group in ipairs(groups) do
+        if group.type == "unit-died" or group.type == "player-died" then
+            local is_player = (group.type == "player-died")
             local bucket    = is_player and losses.player or losses.enemy
-            local key       = (is_player and ev.data.player or ev.data.unit)
-                .. "|" .. (ev.data.cause or "unknown")
+            -- Use group key as unique
+            local key = group.key
             if not bucket[key] then
+                local first_event = group.events[1]
                 bucket[key] = {
-                    type       = ev.type,
-                    unit       = ev.data.unit,
-                    player     = ev.data.player,
-                    cause      = ev.data.cause,
-                    count      = 0,
-                    first_time = ev.game_time,
-                    last_time  = ev.game_time
+                    type       = group.type,
+                    unit       = first_event.data.unit,
+                    player     = first_event.data.player,
+                    cause      = first_event.data.cause,
+                    count      = #group.events,
+                    first_time = first_event.game_time,
+                    last_time  = group.events[#group.events].game_time
                 }
             end
-            local entry     = bucket[key]
-            entry.count     = entry.count + 1
-            entry.last_time = ev.game_time
-        elseif ev.type == "enemy-attack" then
+        elseif group.type == "enemy-attack" then
             -- keep each attack wave entry
+            local first_event = group.events[1]
             table.insert(attacks, {
-                type       = ev.type,
-                surface    = ev.data.surface,
-                position   = ev.data.position,
-                size       = ev.data.size,
-                first_time = ev.game_time
+                type       = group.type,
+                surface    = first_event.data.surface,
+                position   = first_event.data.position,
+                size       = first_event.data.size,
+                first_time = first_event.game_time
             })
         end
     end
@@ -61,8 +60,10 @@ function Export.on_tick(event)
     local tick      = event.tick
     local game_time = Util.tick_to_time(tick)
 
-    -- prune old events
+    -- prune old event groups
     Event.prune(tick)
+    -- prune old chat messages
+    Chat.prune(tick)
 
     local surface               = game.surfaces["nauvis"]
     local evolution             = game.forces["enemy"].get_evolution_factor(surface)
@@ -113,10 +114,9 @@ function Export.on_tick(event)
     enemy_counts.biters.total   = sum(enemy_counts.biters)
     enemy_counts.spitters.total = sum(enemy_counts.spitters)
 
-    -- Summarize & clear events
-    local raw_events            = storage.events or {}
-    local event_summary         = summarize_events(raw_events)
-    storage.events              = {}
+    -- Summarize & clear event groups
+    local event_groups = Event.get_groups()
+    local event_summary = summarize_event_groups(event_groups)
 
     -- Chat output
     local chat_out              = {}
