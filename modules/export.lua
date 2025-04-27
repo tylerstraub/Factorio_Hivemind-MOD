@@ -1,54 +1,102 @@
 -- modules/export.lua
-local Export = {}
+local Export    = {}
 
 -- Configurable heartbeat interval (ticks between exports)
 Export.INTERVAL = 600 -- ~10 seconds
 
-local Util = require("__my-export-mod__/modules/util")
-local Chat = require("__my-export-mod__/modules/chat")
+local Util      = require("__my-export-mod__/modules/util")
+local Chat      = require("__my-export-mod__/modules/chat")
+local Event     = require("__my-export-mod__/modules/event")
+
+-- Summarize unit-died / player-died and collect enemy-attack events
+local function summarize_events(raw_events)
+    local losses = { player = {}, enemy = {} }
+    local attacks = {}
+
+    for _, ev in ipairs(raw_events) do
+        if ev.type == "unit-died" or ev.type == "player-died" then
+            local is_player = (ev.type == "player-died")
+            local bucket    = is_player and losses.player or losses.enemy
+            local key       = (is_player and ev.data.player or ev.data.unit)
+                .. "|" .. (ev.data.cause or "unknown")
+            if not bucket[key] then
+                bucket[key] = {
+                    type       = ev.type,
+                    unit       = ev.data.unit,
+                    player     = ev.data.player,
+                    cause      = ev.data.cause,
+                    count      = 0,
+                    first_time = ev.game_time,
+                    last_time  = ev.game_time
+                }
+            end
+            local entry     = bucket[key]
+            entry.count     = entry.count + 1
+            entry.last_time = ev.game_time
+        elseif ev.type == "enemy-attack" then
+            -- keep each attack wave entry
+            table.insert(attacks, {
+                type       = ev.type,
+                surface    = ev.data.surface,
+                position   = ev.data.position,
+                size       = ev.data.size,
+                first_time = ev.game_time
+            })
+        end
+    end
+
+    -- flatten into arrays
+    local out = {
+        player_losses = {},
+        enemy_losses  = {},
+        enemy_attacks = attacks
+    }
+    for _, v in pairs(losses.player) do table.insert(out.player_losses, v) end
+    for _, v in pairs(losses.enemy) do table.insert(out.enemy_losses, v) end
+
+    return out
+end
 
 function Export.on_tick(event)
     local tick      = event.tick
     local game_time = Util.tick_to_time(tick)
 
-    Chat.prune(tick)
+    -- prune old events
+    Event.prune(tick)
 
-    local surface = game.surfaces["nauvis"]
-
-    -- Enemy metrics
-    local evolution = game.forces["enemy"].get_evolution_factor(surface) --
-    local pollution = surface.get_pollution({ 0, 0 })                    --
+    local surface               = game.surfaces["nauvis"]
+    local evolution             = game.forces["enemy"].get_evolution_factor(surface)
+    local pollution             = surface.get_pollution({ 0, 0 })
 
     -- Player turret counts
-    local player_turrets = {
-        bullet    = surface.count_entities_filtered { type = "ammo-turret", force = "player" },    --
-        laser     = surface.count_entities_filtered { type = "electric-turret", force = "player" }, --
-        flame     = surface.count_entities_filtered { type = "fluid-turret", force = "player" },   --
-        artillery = surface.count_entities_filtered { type = "artillery-turret", force = "player" } --
+    local player_turrets        = {
+        bullet    = surface.count_entities_filtered { type = "ammo-turret", force = "player" },
+        laser     = surface.count_entities_filtered { type = "electric-turret", force = "player" },
+        flame     = surface.count_entities_filtered { type = "fluid-turret", force = "player" },
+        artillery = surface.count_entities_filtered { type = "artillery-turret", force = "player" }
     }
-    player_turrets.total = player_turrets.bullet + player_turrets.laser + player_turrets.flame + player_turrets
-    .artillery
+    player_turrets.total        = player_turrets.bullet
+        + player_turrets.laser
+        + player_turrets.flame
+        + player_turrets.artillery
 
-    local player_research_queue = #game.forces["player"].research_queue --
+    local player_research_queue = #game.forces["player"].research_queue
 
     -- Enemy entity counts
-    local enemy_counts = {
+    local enemy_counts          = {
         spawners = surface.count_entities_filtered { type = "unit-spawner", force = "enemy" },
-
-        worms = {
+        worms    = {
             small    = surface.count_entities_filtered { name = "small-worm-turret", force = "enemy" },
             medium   = surface.count_entities_filtered { name = "medium-worm-turret", force = "enemy" },
             big      = surface.count_entities_filtered { name = "big-worm-turret", force = "enemy" },
             behemoth = surface.count_entities_filtered { name = "behemoth-worm-turret", force = "enemy" }
         },
-
-        biters = {
+        biters   = {
             small    = surface.count_entities_filtered { name = "small-biter", force = "enemy" },
             medium   = surface.count_entities_filtered { name = "medium-biter", force = "enemy" },
             big      = surface.count_entities_filtered { name = "big-biter", force = "enemy" },
             behemoth = surface.count_entities_filtered { name = "behemoth-biter", force = "enemy" }
         },
-
         spitters = {
             small    = surface.count_entities_filtered { name = "small-spitter", force = "enemy" },
             medium   = surface.count_entities_filtered { name = "medium-spitter", force = "enemy" },
@@ -56,89 +104,77 @@ function Export.on_tick(event)
             behemoth = surface.count_entities_filtered { name = "behemoth-spitter", force = "enemy" }
         }
     }
+    local function sum(t)
+        local s = 0
+        for _, v in pairs(t) do s = s + v end
+        return s
+    end
+    enemy_counts.worms.total    = sum(enemy_counts.worms)
+    enemy_counts.biters.total   = sum(enemy_counts.biters)
+    enemy_counts.spitters.total = sum(enemy_counts.spitters)
 
-    -- Add totals inside each category
-    local sum = 0
-    for _, v in pairs(enemy_counts.worms) do sum = sum + v end
-    enemy_counts.worms.total = sum
-    sum = 0
-    for _, v in pairs(enemy_counts.biters) do sum = sum + v end
-    enemy_counts.biters.total = sum
-    sum = 0
-    for _, v in pairs(enemy_counts.spitters) do sum = sum + v end
-    enemy_counts.spitters.total = sum
+    -- Summarize & clear events
+    local raw_events            = storage.events or {}
+    local event_summary         = summarize_events(raw_events)
+    storage.events              = {}
 
-    -- Build chat history
-    local chat_out = {}
+    -- Chat output
+    local chat_out              = {}
     for _, msg in ipairs(storage.chat_messages or {}) do
         table.insert(chat_out, {
             game_time = msg.game_time,
             player    = msg.player,
             message   = msg.message
         })
-    end --
+    end
 
-    -- Player advancement indicators
+    -- Player advancement
     local force = game.forces["player"]
     local total_tech, researched = 0, 0
     for _, tech in pairs(force.technologies) do
         total_tech = total_tech + 1
-        if tech.researched then researched = researched + 1 end                               --
+        if tech.researched then researched = researched + 1 end
     end
-    local current_research    = force.current_research and force.current_research.name or nil --
-    local research_progress   = force.research_progress                                       --
-    local rockets_launched    = force.rockets_launched                                        --
+    local advancement = {
+        research_queue          = player_research_queue,
+        researched_technologies = researched,
+        total_technologies      = total_tech,
+        current_research        = force.current_research and force.current_research.name or nil,
+        research_progress       = force.research_progress,
+        rockets_launched        = force.rockets_launched,
+        satellites_launched     = (prototypes.item["satellite"] and force.get_item_launched("satellite")) or 0,
+        kills                   = (function()
+            local ks, sum = force.get_kill_count_statistics(surface), 0
+            for _, c in pairs(ks.input_counts) do sum = sum + c end
+            return sum
+        end)(),
+        items_produced          = (function()
+            local ps, sum = force.get_item_production_statistics(surface), 0
+            for _, c in pairs(ps.input_counts) do sum = sum + c end
+            return sum
+        end)(),
+        crafting_speed_mod      = force.manual_crafting_speed_modifier,
+        lab_speed_mod           = force.laboratory_speed_modifier
+    }
 
-    local satellites_launched = 0
-    if prototypes.item["satellite"] then
-        satellites_launched = force.get_item_launched("satellite") --
-    end
-
-    local kill_stats = force.get_kill_count_statistics(surface)                               --
-    local kills      = 0
-    for _, cnt in pairs(kill_stats.input_counts) do kills = kills + cnt end                   --
-
-    local prod_stats     = force.get_item_production_statistics(surface)                      --
-    local items_produced = 0
-    for _, cnt in pairs(prod_stats.input_counts) do items_produced = items_produced + cnt end --
-
-    local crafting_speed_mod = force.manual_crafting_speed_modifier                           --
-    local lab_speed_mod      = force.laboratory_speed_modifier                                --
-
-    -- Assemble final export
-    local data               = {
+    -- Final export
+    local data        = {
         tick             = tick,
         game_time        = game_time,
         evolution_factor = evolution,
         pollution        = pollution,
         player           = {
             turrets     = player_turrets,
-            advancement = {
-                research_queue          = player_research_queue,
-                researched_technologies = researched,
-                total_technologies      = total_tech,
-                current_research        = current_research,
-                research_progress       = research_progress,
-                rockets_launched        = rockets_launched,
-                satellites_launched     = satellites_launched,
-                kills                   = kills,
-                items_produced          = items_produced,
-                crafting_speed_mod      = crafting_speed_mod,
-                lab_speed_mod           = lab_speed_mod
-            }
+            advancement = advancement
         },
-        enemy            = {
-            spawners = enemy_counts.spawners,
-            worms    = enemy_counts.worms,
-            biters   = enemy_counts.biters,
-            spitters = enemy_counts.spitters
-        },
+        enemy            = enemy_counts,
+        event_summary    = event_summary,
         chat             = chat_out
     }
 
     -- Serialize, pretty-print, and write out
-    local json_min           = helpers.table_to_json(data)
-    local json_pretty        = Util.pretty_json(json_min)
+    local json_min    = helpers.table_to_json(data)
+    local json_pretty = Util.pretty_json(json_min)
     helpers.write_file("export.json", json_pretty, false)
 end
 

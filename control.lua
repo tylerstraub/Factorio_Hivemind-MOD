@@ -1,18 +1,46 @@
 -- control.lua
 
--- require our modules
-local Chat   = require("__my-export-mod__/modules/chat")
-local Export = require("__my-export-mod__/modules/export")
+local MOD_NAME = "__my-export-mod__"
+local Chat     = require(MOD_NAME .. "/modules/chat")
+local Event    = require(MOD_NAME .. "/modules/event")
+local Export   = require(MOD_NAME .. "/modules/export")
 
--- wire up lifecycle
+-- Safely initialize modules that expose an init() function
+local function safe_init(mod)
+    if mod and type(mod.init) == "function" then
+        mod.init()
+    end
+end
+
+-- Register all handlers in one place
+local function register_handlers()
+    -- Chat messages
+    script.on_event(defines.events.on_console_chat, Chat.on_chat)
+
+    -- Export tick
+    script.on_nth_tick(Export.INTERVAL, Export.on_tick)
+
+    -- All other events from Event.events table
+    for event_id, handler in pairs(Event.events or {}) do
+        script.on_event(event_id, handler)
+    end
+end
+
+-- On mod init (new game or first load)
 script.on_init(function()
-    Chat.init()
+    safe_init(Chat)
+    safe_init(Event)
+    register_handlers()
 end)
 
-script.on_event(defines.events.on_console_chat, function(event)
-    Chat.on_chat(event)
+-- When loading a saved game or after mod configuration changes,
+-- re-register handlers (script.on_event handlers aren’t persisted)
+script.on_configuration_changed(function()
+    safe_init(Chat)
+    safe_init(Event)
+    register_handlers()
 end)
 
-script.on_nth_tick(Export.INTERVAL, function(event)
-    Export.on_tick(event)
+script.on_load(function()
+    register_handlers()
 end)

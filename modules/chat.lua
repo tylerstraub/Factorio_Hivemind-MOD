@@ -2,7 +2,7 @@
 local Chat           = {}
 
 -- Configurable retention settings
-Chat.RETENTION_TICKS = 1 * 60 * 60 -- ~1 minute
+Chat.RETENTION_TICKS = 60 * 60 -- ~1 minute
 Chat.MAX_MESSAGES    = 5
 
 local Util           = require("__my-export-mod__/modules/util")
@@ -17,7 +17,7 @@ function Chat.on_chat(event)
     local player          = game.get_player(event.player_index)
     local name            = (player and player.name) or "Unknown"
 
-    -- build entry with raw tick (for pruning) + human time
+    -- Build entry with raw tick (for pruning) + human time
     table.insert(msgs, {
         tick      = event.tick,
         game_time = Util.tick_to_time(event.tick),
@@ -25,7 +25,7 @@ function Chat.on_chat(event)
         message   = event.message
     })
 
-    -- prune immediately on new chat
+    -- Prune immediately on new chat
     Chat.prune(event.tick)
 end
 
@@ -35,17 +35,22 @@ function Chat.prune(current_tick)
     local cutoff          = current_tick - Chat.RETENTION_TICKS
     local i               = 1
 
-    -- prune by age
+    -- Prune by age
     while i <= #msgs and msgs[i].tick < cutoff do
         table.remove(msgs, i)
     end
 
-    -- prune by count
+    -- Prune by count
     while #msgs > Chat.MAX_MESSAGES do
         table.remove(msgs, 1)
     end
 
     storage.chat_messages = msgs
 end
+
+-- Event registration
+Chat.events = {
+    [defines.events.on_console_chat] = Chat.on_chat
+}
 
 return Chat
