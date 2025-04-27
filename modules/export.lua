@@ -2,7 +2,7 @@
 local Export    = {}
 
 -- Configurable heartbeat interval (ticks between exports)
-Export.INTERVAL = 600 -- ~10 seconds
+Export.INTERVAL = 60 -- 1 second
 
 local Util      = require("__my-export-mod__/modules/util")
 local Chat      = require("__my-export-mod__/modules/chat")
