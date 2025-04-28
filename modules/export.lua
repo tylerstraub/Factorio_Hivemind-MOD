@@ -42,7 +42,7 @@ local function summarize_event_groups(groups)
                 surface    = first_event.data.surface,
                 position   = first_event.data.position,
                 size       = first_event.data.size,
-                first_time = first_event.game_time,
+                start_time = first_event.game_time,
                 nearest_location = first_event.data.nearest_location
             })
         end
