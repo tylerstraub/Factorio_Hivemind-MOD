@@ -42,7 +42,8 @@ local function summarize_event_groups(groups)
                 surface    = first_event.data.surface,
                 position   = first_event.data.position,
                 size       = first_event.data.size,
-                first_time = first_event.game_time
+                first_time = first_event.game_time,
+                nearest_location = first_event.data.nearest_location
             })
         end
     end
@@ -131,6 +132,16 @@ function Export.on_tick(event)
         })
     end
 
+    -- Get all player map tags for this surface for debug/export
+    local map_tags = {}
+    local player_tags = game.forces["player"].find_chart_tags(surface)
+    for _, tag in ipairs(player_tags) do
+        table.insert(map_tags, {
+            name = (type(tag.text) == "string" and tag.text) or (type(tag.text) == "table" and tag.text[1]) or "",
+            position = tag.position
+        })
+    end
+
     -- Player advancement
     local force = game.forces["player"]
     local total_tech, researched = 0, 0
@@ -176,7 +187,8 @@ function Export.on_tick(event)
                     table.insert(names, p.name)
                 end
                 return names
-            end)()
+            end)(),
+            map_tags = map_tags
         },
         enemy            = enemy_counts,
         event_summary    = event_summary,

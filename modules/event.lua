@@ -76,11 +76,28 @@ end
 function Event.on_enemy_attack(event)
     local group = event.group
     if group.force.name ~= "enemy" then return end
+    local surface = group.surface
+    local force = group.force
+    local position = group.position
+
+    -- Find nearest map tag (named location)
+    local nearest_tag = Util.find_nearest_chart_tag(surface, force, position)
+    local nearest_location = nil
+    if nearest_tag then
+        if type(nearest_tag.text) == "string" then
+            nearest_location = nearest_tag.text
+        elseif type(nearest_tag.text) == "table" and nearest_tag.text[1] then
+            nearest_location = tostring(nearest_tag.text[1])
+        end
+    else
+    end
+
     Event.record("enemy-attack", {
-        force    = group.force.name,
-        surface  = group.surface.name,
-        position = group.position,
-        size     = #group.members
+        force    = force.name,
+        surface  = surface.name,
+        position = position,
+        size     = #group.members,
+        nearest_location = nearest_location
     })
 end
 

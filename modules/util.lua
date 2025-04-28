@@ -48,4 +48,25 @@ function Util.tick_to_time(tick)
     return string.format("%02d:%02d:%02d", hh, mm, ss)
 end
 
+-- Find the nearest chart tag (map label) to a given position for a force/surface
+function Util.find_nearest_chart_tag(surface, force, position)
+    -- Always use the player force for map tags
+    local tags = game.forces["player"].find_chart_tags(surface)
+    if not tags or #tags == 0 then return nil end
+    local nearest_tag = nil
+    local nearest_dist = math.huge
+    for _, tag in ipairs(tags) do
+        if tag.position and tag.text then
+            local dx = tag.position.x - position.x
+            local dy = tag.position.y - position.y
+            local dist = dx * dx + dy * dy -- squared distance
+            if dist < nearest_dist then
+                nearest_dist = dist
+                nearest_tag = tag
+            end
+        end
+    end
+    return nearest_tag
+end
+
 return Util
