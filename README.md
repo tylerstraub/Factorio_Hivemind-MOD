@@ -1,75 +1,66 @@
-# Hivemind Factorio Mod
+# Hivemind
 
-![Hivemind Thumbnail](thumbnail.png)
+A Factorio mod that exports game state information as JSON for consumption by a NodeJS companion service that provides AI agent functionality to the alien faction.
 
-## Description
+## Overview
 
-Hivemind is a Factorio mod designed to export comprehensive stateful game information to a third-party service. This data is intended to be consumed by an external NodeJS companion service (to be announced) which will provide advanced AI Agent functionality to the alien faction within Factorio, creating a more dynamic and challenging enemy.
+Hivemind monitors game events, collects statistics about both player and enemy forces, and exports this data to a JSON file that can be consumed by an external service. This enables AI-driven behavior for the enemy faction in Factorio.
 
 ## Features
 
-The mod collects and exports the following game state information:
+- **Real-time data export**: Exports game state to JSON file at configurable intervals
+- **Event tracking**: Records and summarizes important events such as:
+  - Enemy attacks on player bases
+  - Player building destruction
+  - Unit deaths (both player and enemy)
+  - Player deaths
+- **Chat monitoring**: Captures in-game chat messages for AI reaction
+- **Comprehensive game state**: Tracks:
+  - Enemy evolution factor
+  - Pollution levels
+  - Unit counts for both forces
+  - Player research progress
+  - Map tags/locations
 
-- **Current Game State:** Tick, game time, evolution factor, and pollution levels.
-- **Player Information:** Connected players (count and names), player turret counts (bullet, laser, flame, artillery), and player advancement statistics (research progress, kills, production, etc.). Also includes player-placed map tags.
-- **Enemy Information:** Counts of enemy spawners, worms, biters, and spitters by size.
-- **Chat History:** Recent in-game chat messages (configurable retention).
-- **Event History:** Summarized game events, including:
-  - Enemy attacks on player bases.
-  - Player building destruction by enemies.
-  - Unit deaths.
-  - Player deaths.
+## Configuration Settings
 
-This data is exported periodically to a JSON file within the mod's directory.
+The mod provides several settings to control its behavior:
+
+| Setting              | Description                                | Default | Range  |
+| -------------------- | ------------------------------------------ | ------- | ------ |
+| Export Interval      | How often to export JSON data (seconds)    | 1       | 1-3600 |
+| Chat Retention Time  | How long to retain chat messages (seconds) | 60      | 1-3600 |
+| Max Chat Messages    | Maximum number of chat messages to store   | 5       | 1-100  |
+| Event Retention Time | How long to keep event history (seconds)   | 60      | 1-3600 |
+| Max Event Groups     | Maximum number of event groups to store    | 5       | 1-100  |
 
 ## Installation
 
-1.  Download the `Hivemind_0.1.0.zip` file (or the equivalent version). **Note: You may need to package the mod directory into a zip file yourself if you cloned the repository directly.**
-2.  Locate your Factorio user data directory. This varies depending on your operating system:
-    - **Windows:** `%APPDATA%\Factorio`
-    - **macOS:** `~/Library/Application Support/factorio`
-    - **Linux:** `~/.factorio`
-3.  Navigate to the `mods` subdirectory within your Factorio user data directory.
-4.  Place the `Hivemind_0.1.0.zip` file into the `mods` directory.
-5.  Launch Factorio. The mod should appear in the "Mods" menu and be enabled by default.
+1. Download the latest release
+2. Place the mod folder in your Factorio mods directory:
+   - Windows: `%APPDATA%\Factorio\mods`
+   - Linux: `~/.factorio/mods`
+   - macOS: `~/Library/Application Support/factorio/mods`
+3. Enable the mod in the Factorio Mods menu
 
-## Configuration
+## Integration
 
-The mod provides several startup settings that can be configured in Factorio's "Settings" menu under the "Startup" tab. These settings control the retention of chat and event history, and the frequency of the data export:
+The mod creates a file named `hivemind.json` in your Factorio scenario directory, which is updated at the configured interval. The external NodeJS service (to be announced) will read this file to provide AI agent functionality.
 
-- `hivemind_chat_retention_seconds`: How long chat messages are kept in memory before pruning (default: 60 seconds).
-- `hivemind_chat_max_messages`: Maximum number of chat messages to retain (default: 5).
-- `hivemind_event_retention_seconds`: How long event history groups are kept in memory before pruning (default: 60 seconds).
-- `hivemind_event_max_groups`: Maximum number of event groups to retain (default: 5).
-- `hivemind_export_interval_seconds`: The interval, in seconds, between each data export cycle (default: 1 second).
+## JSON Data Format
 
-## JSON Export Format
+The exported JSON contains:
 
-The mod exports the collected stateful information to `hivemind.json` within the mod's save data directory (typically found within your Factorio user data directory, specific location depends on your OS and save name). The JSON structure includes the following top-level keys:
+- **Game state**: Tick count, game time, evolution factor, pollution level
+- **Player data**: Turret counts, research progress, connected players, map tags
+- **Enemy data**: Counts of spawners, worms, biters and spitters by type
+- **Event summary**: Recent attacks, losses on both sides
+- **Chat**: Recent chat messages
 
-- `tick`: The current game tick.
-- `game_time`: The current game time in HH:MM:SS format.
-- `evolution_factor`: The current enemy evolution factor.
-- `pollution`: The total pollution level on the Nauvis surface.
-- `player`: Object containing player-specific information:
-  - `turrets`: Object with counts of different turret types.
-  - `advancement`: Object with various player progress statistics.
-  - `connected_count`: Number of connected players.
-  - `connected_names`: Array of connected player names.
-  - `map_tags`: Array of player-placed chart tags (name and position).
-- `enemy`: Object containing enemy entity counts (spawners, worms, biters, spitters).
-- `event_summary`: Object summarizing recent event groups:
-  - `player_losses`: Array of summarized player and player building losses.
-  - `enemy_losses`: Array of summarized enemy unit losses.
-  - `enemy_attacks`: Array of summarized enemy attack events.
-- `chat`: Array of recent chat messages (game time, tick, player, message).
+## Requirements
 
-The exact structure and contents of nested objects and arrays can be best understood by examining the `hivemind.json` file generated by the mod during gameplay and the `modules/export.lua` script.
+- Factorio 2.0 or higher
 
-## Companion Service (To Be Announced)
+## Author
 
-This mod is designed to work in tandem with a separate NodeJS service that will process the exported game state data to control and enhance the behavior of the alien faction. Details about this companion service will be announced separately.
-
-## Credits
-
-- **Author:** Tyler Straub
+Tyler Straub
