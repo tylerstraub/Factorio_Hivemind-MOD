@@ -1,9 +1,6 @@
 -- modules/export.lua
 local Export    = {}
 
--- Configurable heartbeat interval (ticks between exports)
-Export.INTERVAL = 60 -- 1 second
-
 local Util      = require("__my-export-mod__/modules/util")
 local Chat      = require("__my-export-mod__/modules/chat")
 local Event     = require("__my-export-mod__/modules/event")
@@ -31,7 +28,9 @@ local function summarize_event_groups(groups)
                     cause_player= first_event.data.cause_player,
                     count      = #group.events,
                     first_time = first_event.game_time,
-                    last_time  = group.events[#group.events].game_time
+                    first_tick = first_event.tick,
+                    last_time  = group.events[#group.events].game_time,
+                    last_tick  = group.events[#group.events].tick
                 }
             end
         elseif group.type == "enemy-attack" then
@@ -43,6 +42,7 @@ local function summarize_event_groups(groups)
                 position   = first_event.data.position,
                 size       = first_event.data.size,
                 start_time = first_event.game_time,
+                start_tick = first_event.tick,
                 nearest_location = first_event.data.nearest_location
             })
         end
@@ -58,6 +58,11 @@ local function summarize_event_groups(groups)
     for _, v in pairs(losses.enemy) do table.insert(out.enemy_losses, v) end
 
     return out
+end
+
+function Export.get_interval()
+    local seconds = settings.global["my_export_mod_export_interval_seconds"] and settings.global["my_export_mod_export_interval_seconds"].value or 1
+    return seconds * 60
 end
 
 function Export.on_tick(event)
@@ -127,6 +132,7 @@ function Export.on_tick(event)
     for _, msg in ipairs(storage.chat_messages or {}) do
         table.insert(chat_out, {
             game_time = msg.game_time,
+            game_tick = msg.tick,
             player    = msg.player,
             message   = msg.message
         })

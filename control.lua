@@ -17,13 +17,22 @@ local function register_handlers()
     -- Chat messages
     script.on_event(defines.events.on_console_chat, Chat.on_chat)
 
-    -- Export tick
-    script.on_nth_tick(Export.INTERVAL, Export.on_tick)
+    -- Export tick (register after settings are available)
+    register_nth_tick_handler()
 
     -- All other events from Event.events table
     for event_id, handler in pairs(Event.events or {}) do
         script.on_event(event_id, handler)
     end
+end
+
+-- Register nth-tick handler for export interval
+function register_nth_tick_handler()
+    local interval = Export.get_interval()
+    if type(interval) ~= "number" or interval < 1 then
+        interval = 60 -- fallback default
+    end
+    script.on_nth_tick(interval, Export.on_tick)
 end
 
 -- On mod init (new game or first load)

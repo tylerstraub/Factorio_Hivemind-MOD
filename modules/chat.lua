@@ -1,9 +1,13 @@
 -- modules/chat.lua
 local Chat           = {}
 
--- Configurable retention settings
-Chat.RETENTION_TICKS = 60 * 60 -- ~1 minute
-Chat.MAX_MESSAGES    = 5
+function Chat.get_retention_ticks()
+    local seconds = settings.global["my_export_mod_chat_retention_seconds"] and settings.global["my_export_mod_chat_retention_seconds"].value or 60
+    return seconds * 60
+end
+function Chat.get_max_messages()
+    return settings.global["my_export_mod_chat_max_messages"] and settings.global["my_export_mod_chat_max_messages"].value or 5
+end
 
 local Util           = require("__my-export-mod__/modules/util")
 
@@ -32,7 +36,7 @@ end
 function Chat.prune(current_tick)
     storage.chat_messages = storage.chat_messages or {}
     local msgs            = storage.chat_messages
-    local cutoff          = current_tick - Chat.RETENTION_TICKS
+    local cutoff          = current_tick - Chat.get_retention_ticks()
     local i               = 1
 
     -- Prune by age
@@ -41,7 +45,7 @@ function Chat.prune(current_tick)
     end
 
     -- Prune by count
-    while #msgs > Chat.MAX_MESSAGES do
+    while #msgs > Chat.get_max_messages() do
         table.remove(msgs, 1)
     end
 

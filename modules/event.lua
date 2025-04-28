@@ -1,9 +1,14 @@
 -- modules/event.lua
 local Event           = {}
 
--- Configurable retention settings
-Event.RETENTION_TICKS = 60 * 60 -- ~1 minute
-Event.MAX_GROUPS      = 5 -- Now we limit by group, not individual event
+-- Helper functions for startup settings
+function Event.get_retention_ticks()
+    local seconds = settings.global["my_export_mod_event_retention_seconds"] and settings.global["my_export_mod_event_retention_seconds"].value or 60
+    return seconds * 60
+end
+function Event.get_max_groups()
+    return settings.global["my_export_mod_event_max_groups"] and settings.global["my_export_mod_event_max_groups"].value or 5
+end
 
 local Util            = require("__my-export-mod__/modules/util")
 
@@ -52,7 +57,7 @@ end
 function Event.prune(current_tick)
     storage.event_groups = storage.event_groups or {}
     local groups = storage.event_groups
-    local cutoff = current_tick - Event.RETENTION_TICKS
+    local cutoff = current_tick - Event.get_retention_ticks()
     -- Remove groups by age ONLY
     for key, group in pairs(groups) do
         if group.last_tick < cutoff then
@@ -65,7 +70,7 @@ function Event.prune(current_tick)
         table.insert(group_list, group)
     end
     table.sort(group_list, function(a, b) return a.first_tick < b.first_tick end)
-    while #group_list > Event.MAX_GROUPS do
+    while #group_list > Event.get_max_groups() do
         groups[group_list[1].key] = nil
         table.remove(group_list, 1)
     end
