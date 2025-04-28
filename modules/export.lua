@@ -14,8 +14,8 @@ local function summarize_event_groups(groups)
     local attacks = {}
 
     for _, group in ipairs(groups) do
-        if group.type == "unit-died" or group.type == "player-died" then
-            local is_player = (group.type == "player-died")
+        if group.type == "unit-died" or group.type == "player-died" or group.type == "player-building-destroyed" then
+            local is_player = (group.type == "player-died" or group.type == "player-building-destroyed")
             local bucket    = is_player and losses.player or losses.enemy
             -- Use group key as unique
             local key = group.key
@@ -25,7 +25,10 @@ local function summarize_event_groups(groups)
                     type       = group.type,
                     unit       = first_event.data.unit,
                     player     = first_event.data.player,
+                    building   = first_event.data.building,
                     cause      = first_event.data.cause,
+                    cause_force= first_event.data.cause_force,
+                    cause_player= first_event.data.cause_player,
                     count      = #group.events,
                     first_time = first_event.game_time,
                     last_time  = group.events[#group.events].game_time
@@ -165,7 +168,15 @@ function Export.on_tick(event)
         pollution        = pollution,
         player           = {
             turrets     = player_turrets,
-            advancement = advancement
+            advancement = advancement,
+            connected_count = #game.connected_players,
+            connected_names = (function()
+                local names = {}
+                for _, p in pairs(game.connected_players) do
+                    table.insert(names, p.name)
+                end
+                return names
+            end)()
         },
         enemy            = enemy_counts,
         event_summary    = event_summary,

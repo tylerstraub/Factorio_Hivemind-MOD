@@ -18,6 +18,8 @@ local group_key = function(event_type, event_data)
         return event_type .. "|" .. (event_data.player or event_data.unit or "unknown") .. "|" .. (event_data.cause or "unknown")
     elseif event_type == "enemy-attack" then
         return event_type .. "|" .. (event_data.surface or "unknown") .. "|" .. (event_data.position and (event_data.position.x .. "," .. event_data.position.y) or "unknown")
+    elseif event_type == "player-building-destroyed" then
+        return event_type .. "|" .. (event_data.building or "unknown") .. "|" .. (event_data.cause_force or "unknown")
     else
         return event_type
     end
@@ -82,16 +84,52 @@ function Event.on_enemy_attack(event)
     })
 end
 
+-- Handler for player building deaths by enemy
+function Event.on_player_building_destroyed(event)
+    local entity = event.entity
+    -- Only interested in player buildings (not units, vehicles, etc.)
+    if not (entity and entity.valid and entity.force and entity.force.name == "player" and entity.type ~= "unit" and entity.type ~= "player") then return end
+    -- Only count if killed by enemy force
+    local killer_force = (event.force and event.force.name) or ((event.cause and event.cause.force) and event.cause.force.name)
+    if killer_force ~= "enemy" then return end
+    Event.record("player-building-destroyed", {
+        building    = entity.name,
+        cause       = event.cause and event.cause.name or nil,
+        cause_force = killer_force,
+        position    = entity.position,
+        surface     = entity.surface.name
+    })
+end
+
 -- Handler for unit deaths
 function Event.on_unit_died(event)
     local entity = event.entity
     if not (entity and entity.valid and entity.type == "unit") then return end
     local cause = event.cause
+    local cause_name = cause and cause.name or nil
+    local cause_force = (cause and cause.force) and cause.force.name or nil
+    local cause_player = nil
+    if cause then
+        if cause.type == "player" and cause.player then
+            local player_obj = game.get_player(cause.player.index)
+            if player_obj and player_obj.valid then
+                cause_player = player_obj.name
+            end
+        elseif cause.type == "character" then
+            for _, player in pairs(game.connected_players) do
+                if player.character == cause then
+                    cause_player = player.name
+                    break
+                end
+            end
+        end
+    end
     Event.record("unit-died", {
         unit        = entity.name,
         unit_force  = entity.force and entity.force.name or nil,
-        cause       = cause and cause.name or nil,
-        cause_force = (cause and cause.force) and cause.force.name or nil,
+        cause       = cause_name,
+        cause_force = cause_force,
+        cause_player= cause_player,
         position    = entity.position,
         surface     = entity.surface.name
     })
@@ -123,7 +161,16 @@ end
 -- Register events
 Event.events = {
     [defines.events.on_unit_group_finished_gathering] = Event.on_enemy_attack,
-    [defines.events.on_entity_died]                   = Event.on_unit_died,
+    [defines.events.on_entity_died]                   = function(event)
+        -- Route to the correct handler based on entity type/force
+        if event.entity and event.entity.valid and event.entity.force and event.entity.force.name == "player" and event.entity.type ~= "unit" and event.entity.type ~= "player" then
+            Event.on_player_building_destroyed(event)
+        elseif event.entity and event.entity.valid and event.entity.type == "unit" then
+            Event.on_unit_died(event)
+        elseif event.entity and event.entity.valid and event.entity.type == "player" then
+            Event.on_player_died(event)
+        end
+    end,
     [defines.events.on_player_died]                   = Event.on_player_died
 }
 
