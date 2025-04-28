@@ -2,8 +2,8 @@
   "name": "Hivemind",
   "version": "0.1.0",
   "title": "Hivemind",
-  "author": "YourName",
+  "author": "Tyler Straub",
   "factorio_version": "2.0",
   "dependencies": ["base"],
-  "description": "Periodic export of game state."
+  "description": "Game state exporter supporting Hivemind NodeJS service"
 }
