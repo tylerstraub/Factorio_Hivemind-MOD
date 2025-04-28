@@ -1,0 +1,40 @@
+# Factorio Mod: Hivemind .gitignore
+# Ignore OS-specific files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails and previews
+._*
+
+# Factorio mod build artifacts (if any custom build scripts are used)
+*.zip
+*.tmp
+
+# Ignore logs and temp files
+*.log
+*.bak
+*.swp
+*.swo
+
+# Ignore Python cache if any scripts are used for tooling
+dist/
+__pycache__/
+*.pyc
+
+# Ignore hidden files
+.*~
+
+# Ignore node_modules if using Node.js for tooling
+node_modules/
+
+# Ignore backup files
+*~
+
+# Ignore VSCode settings (optional)
+.vscode/
+
+# Ignore macOS system files
+Icon?
+
+# End of .gitignore
