@@ -2,14 +2,14 @@
 local Chat           = {}
 
 function Chat.get_retention_ticks()
-    local seconds = settings.global["my_export_mod_chat_retention_seconds"] and settings.global["my_export_mod_chat_retention_seconds"].value or 60
+    local seconds = settings.global["hivemind_chat_retention_seconds"] and settings.global["hivemind_chat_retention_seconds"].value or 60
     return seconds * 60
 end
 function Chat.get_max_messages()
-    return settings.global["my_export_mod_chat_max_messages"] and settings.global["my_export_mod_chat_max_messages"].value or 5
+    return settings.global["hivemind_chat_max_messages"] and settings.global["hivemind_chat_max_messages"].value or 5
 end
 
-local Util           = require("__my-export-mod__/modules/util")
+local Util           = require("__Hivemind__/modules/util")
 
 function Chat.init()
     storage.chat_messages = {}

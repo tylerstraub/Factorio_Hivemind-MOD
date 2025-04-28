@@ -1,9 +1,9 @@
--- settings.lua: Startup settings for my-export-mod (now in seconds)
+-- settings.lua: Startup settings for Hivemind (now in seconds)
 
 local startup_settings = {
   {
     type = "int-setting",
-    name = "my_export_mod_chat_retention_seconds",
+    name = "hivemind_chat_retention_seconds",
     setting_type = "startup",
     default_value = 60, -- 1 minute
     minimum_value = 1,
@@ -14,7 +14,7 @@ local startup_settings = {
   },
   {
     type = "int-setting",
-    name = "my_export_mod_chat_max_messages",
+    name = "hivemind_chat_max_messages",
     setting_type = "startup",
     default_value = 5,
     minimum_value = 1,
@@ -25,7 +25,7 @@ local startup_settings = {
   },
   {
     type = "int-setting",
-    name = "my_export_mod_event_retention_seconds",
+    name = "hivemind_event_retention_seconds",
     setting_type = "startup",
     default_value = 60, -- 1 minute
     minimum_value = 1,
@@ -36,7 +36,7 @@ local startup_settings = {
   },
   {
     type = "int-setting",
-    name = "my_export_mod_event_max_groups",
+    name = "hivemind_event_max_groups",
     setting_type = "startup",
     default_value = 5,
     minimum_value = 1,
@@ -47,7 +47,7 @@ local startup_settings = {
   },
   {
     type = "int-setting",
-    name = "my_export_mod_export_interval_seconds",
+    name = "hivemind_export_interval_seconds",
     setting_type = "startup",
     default_value = 1, -- 1 second
     minimum_value = 1,

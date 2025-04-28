@@ -1,9 +1,9 @@
 -- modules/export.lua
 local Export    = {}
 
-local Util      = require("__my-export-mod__/modules/util")
-local Chat      = require("__my-export-mod__/modules/chat")
-local Event     = require("__my-export-mod__/modules/event")
+local Util      = require("__Hivemind__/modules/util")
+local Chat      = require("__Hivemind__/modules/chat")
+local Event     = require("__Hivemind__/modules/event")
 
 -- Summarize unit-died / player-died and collect enemy-attack events
 local function summarize_event_groups(groups)
@@ -61,7 +61,7 @@ local function summarize_event_groups(groups)
 end
 
 function Export.get_interval()
-    local seconds = settings.global["my_export_mod_export_interval_seconds"] and settings.global["my_export_mod_export_interval_seconds"].value or 1
+    local seconds = settings.global["hivemind_export_interval_seconds"] and settings.global["hivemind_export_interval_seconds"].value or 1
     return seconds * 60
 end
 
@@ -204,7 +204,7 @@ function Export.on_tick(event)
     -- Serialize, pretty-print, and write out
     local json_min    = helpers.table_to_json(data)
     local json_pretty = Util.pretty_json(json_min)
-    helpers.write_file("export.json", json_pretty, false)
+    helpers.write_file("hivemind.json", json_pretty, false)
 end
 
 return Export

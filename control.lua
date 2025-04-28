@@ -1,6 +1,6 @@
 -- control.lua
 
-local MOD_NAME = "__my-export-mod__"
+local MOD_NAME = "__Hivemind__"
 local Chat     = require(MOD_NAME .. "/modules/chat")
 local Event    = require(MOD_NAME .. "/modules/event")
 local Export   = require(MOD_NAME .. "/modules/export")

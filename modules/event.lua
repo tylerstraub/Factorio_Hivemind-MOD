@@ -3,14 +3,14 @@ local Event           = {}
 
 -- Helper functions for startup settings
 function Event.get_retention_ticks()
-    local seconds = settings.global["my_export_mod_event_retention_seconds"] and settings.global["my_export_mod_event_retention_seconds"].value or 60
+    local seconds = settings.global["hivemind_event_retention_seconds"] and settings.global["hivemind_event_retention_seconds"].value or 60
     return seconds * 60
 end
 function Event.get_max_groups()
-    return settings.global["my_export_mod_event_max_groups"] and settings.global["my_export_mod_event_max_groups"].value or 5
+    return settings.global["hivemind_event_max_groups"] and settings.global["hivemind_event_max_groups"].value or 5
 end
 
-local Util            = require("__my-export-mod__/modules/util")
+local Util            = require("__Hivemind__/modules/util")
 
 function Event.init()
     storage.event_groups = {}
