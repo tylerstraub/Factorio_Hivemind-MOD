@@ -30,7 +30,7 @@ end)
 --  - Mutating storage here will desync multiplayer
 script.on_load(function()
   logging.info("Hivemind mod loading (on_load)")
-  -- Only registration is needed on load; do not re-init storage or register state-mutating event handlers here.
+  event_listener.register()    -- Ensure event handlers are re-registered on all peers
   commands_module.register()
 end)
 

@@ -36,8 +36,14 @@ event_listener.handlers = {
 
 --- Register all relevant event handlers (modular)
 function event_listener.register()
-  for event_id, handler in pairs(event_listener.handlers) do
-    script.on_event(event_id, handler)
+  -- Register handlers in deterministic (sorted) order for multiplayer safety
+  local event_ids = {}
+  for event_id in pairs(event_listener.handlers) do
+    table.insert(event_ids, event_id)
+  end
+  table.sort(event_ids)
+  for _, event_id in ipairs(event_ids) do
+    script.on_event(event_id, event_listener.handlers[event_id])
   end
   logging.info("All event listeners registered.")
 end
