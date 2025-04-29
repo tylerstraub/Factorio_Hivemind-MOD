@@ -5,6 +5,36 @@ This document is a living developer log and technical reference for the Hivemind
 
 ---
 
+## Multiplayer & Dedicated Server Safety (2025-04-29 Update)
+
+> **IMPORTANT:** As of Factorio 2.0+, all event handler and command registration must be done in a deterministic order on all peers (server and clients). Non-deterministic registration (e.g., using `pairs` over a table) will cause multiplayer join failures or desyncs.
+>
+> - **Always** use arrays + `ipairs`, or collect and sort keys before iterating with `pairs` for registration.
+> - This requirement applies to both `script.on_event` and `commands.add_command`.
+> - See `SAFETY.md` for full rationale and examples.
+
+### Example: Deterministic Registration
+```lua
+-- BAD:
+for event_id, handler in pairs(handlers) do
+  script.on_event(event_id, handler)
+end
+
+-- GOOD:
+local event_ids = {}
+for event_id in pairs(handlers) do table.insert(event_ids, event_id) end
+table.sort(event_ids)
+for _, event_id in ipairs(event_ids) do
+  script.on_event(event_id, handlers[event_id])
+end
+```
+
+### Why This Matters
+- Factorio 2.0+ will reject multiplayer join if event/command registration order is not identical between all peers.
+- This is stricter than previous Factorio versions and must be followed for all multiplayer/dedicated server mods.
+
+---
+
 ## Project Goals
 - **Efficient, safe, and lossless export of system events and stateful data** for external consumption (via RCON and other automated tools).
 - **Zero impact on Factorio's synchronous game loop:** All data collection, storage, and export must avoid stutters and maintain 60 UPS.

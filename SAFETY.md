@@ -1,3 +1,39 @@
+## Multiplayer Safety: Deterministic Registration is Required
+
+**[Update 2025-04-29]**
+
+> **IMPORTANT:** As of Factorio 2.0+, it is not enough to simply re-register event handlers and commands on all peers (server and clients). The *order* of registration must be deterministic and identical on all peers, or multiplayer synchronization will fail.
+>
+> - Always register event handlers and commands in a deterministic order (e.g., using arrays + `ipairs`, or sorting keys before iterating with `pairs`).
+> - Using `pairs` on a table with string or numeric keys is **not safe** for registration order. Registration order may differ between Lua runtimes, causing desync errors.
+> - This applies to both `script.on_event` and `commands.add_command`.
+
+### Example: Safe Event Handler Registration
+```lua
+-- BAD (non-deterministic):
+for event_id, handler in pairs(handlers) do
+  script.on_event(event_id, handler)
+end
+
+-- GOOD (deterministic):
+local event_ids = {}
+for event_id in pairs(handlers) do table.insert(event_ids, event_id) end
+table.sort(event_ids)
+for _, event_id in ipairs(event_ids) do
+  script.on_event(event_id, handlers[event_id])
+end
+```
+
+### Lifecycle Hooks (Best Practice)
+- Register event handlers and commands in all peers' `on_load` (no state mutation!), and on the server in `on_init` and `on_configuration_changed`.
+- Never mutate persistent state in `on_load`.
+
+### Why This Matters
+- **Desyncs:** If registration order differs, Factorio will refuse multiplayer join and report "event handlers are not identical between you and the server."
+- **Safety:** This pattern is required for all mods targeting multiplayer or dedicated servers.
+
+---
+
 ## 1. `script.on_init`  
 > **Fires once, on the dedicated server, when**  
 > - A brand-new save is created, or  

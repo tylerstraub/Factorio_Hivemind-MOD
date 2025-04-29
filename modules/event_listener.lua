@@ -6,7 +6,8 @@ local logging = require("modules.logging")
 local event_listener = {}
 
 -- Central registry for all event types and their handlers
--- Add new event types here for modular registration
+-- IMPORTANT: Registration order must be deterministic for multiplayer safety.
+-- Always use arrays + ipairs, or sort keys before iterating with pairs.
 -- Example: [defines.events.on_built_entity] = event_listener.on_built_event,
 event_listener.handlers = {
   [defines.events.on_unit_group_finished_gathering] = function(event)
@@ -37,6 +38,7 @@ event_listener.handlers = {
 --- Register all relevant event handlers (modular)
 function event_listener.register()
   -- Register handlers in deterministic (sorted) order for multiplayer safety
+  -- DO NOT use pairs() directly for registration; always sort keys first.
   local event_ids = {}
   for event_id in pairs(event_listener.handlers) do
     table.insert(event_ids, event_id)

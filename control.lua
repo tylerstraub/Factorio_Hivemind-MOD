@@ -12,6 +12,7 @@ local logging = require("modules.logging")
 --  - Registers state-mutating event handlers
 --  - Registers commands
 --  NEVER call from script.on_load (would desync multiplayer)
+--  All registration must be deterministic: see modules/event_listener.lua and SAFETY.md
 local function initialize()
   logging.info("Hivemind mod initializing (on_init/config change)")
   storage.init()
@@ -28,9 +29,10 @@ end)
 --  SAFE: Called on every peer (server and all clients) when the mod loads
 --  - Only re-register event handlers and commands (NO persistent state mutation!)
 --  - Mutating storage here will desync multiplayer
+--  - Registration order for event handlers and commands MUST be deterministic across all peers.
 script.on_load(function()
   logging.info("Hivemind mod loading (on_load)")
-  event_listener.register()    -- Ensure event handlers are re-registered on all peers
+  event_listener.register()    -- Ensure event handlers are re-registered on all peers (deterministic order)
   commands_module.register()
 end)
 
