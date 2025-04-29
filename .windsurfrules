@@ -1,0 +1,9 @@
+1. This is a Factorio mod
+2. Factorio version: 2.0.42
+3. Avoid making assumptions about the Factorio API because your training data is likely out of date.
+4. Use online search tools to validate assumptions
+
+Official documentation sources:
+
+https://wiki.factorio.com/
+https://lua-api.factorio.com/2.0.45/
