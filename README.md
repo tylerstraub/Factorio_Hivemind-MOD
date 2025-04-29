@@ -18,8 +18,9 @@ This document is a living developer log and technical reference for the Hivemind
   - All logic must be safe to run in Factorio's single game thread. No operation should block or delay the simulation.
   - Avoid large table traversals or complex computation in per-tick/event handlers.
 - **Persistent State:**
-  - All persistent state is stored in the `storage` table (never `global`, which is undefined in Factorio 2.0+).
-  - Storage helpers (see `modules/storage.lua`) encapsulate all access and mutation.
+  - All persistent state is stored in the Factorio 2.0+ `storage` table (never `global`, which is undefined in Factorio 2.0+).
+  - Storage helpers (see `modules/storage.lua`) encapsulate all access and mutation, always referencing the engine-provided `storage` table via a `get_storage()` helper. This ensures multiplayer and dedicated server safety.
+  - **Do not mutate persistent state in `on_load`.** All initialization and mutation occurs in `on_init`, `on_configuration_changed`, or event handlers, per Factorio best practices.
 - **Dynamic Configuration:**
   - All runtime-global settings (e.g., event retention) are read live from `settings.global`.
   - Never cache settings; always re-read to support live tuning.
@@ -35,12 +36,26 @@ This document is a living developer log and technical reference for the Hivemind
 
 ## Module Overview
 - **control.lua**: Entrypoint; manages mod lifecycle, module initialization, and command/event registration.
-- **modules/storage.lua**: Persistent storage helpers; handles all event storage, pruning, and retrieval.
+- **modules/storage.lua**: Persistent storage helpers; handles all event storage, pruning, and retrieval. All persistent data is stored in the Factorio `storage` table, ensuring compatibility with multiplayer and dedicated servers.
 - **modules/event_listener.lua**: Registers and handles relevant game events (e.g., enemy group attack decisions). Prunes old events and logs new ones.
 - **modules/commands.lua**: Registers and implements custom commands for data export and management.
 - **modules/logging.lua**: Centralized logging utility, controlled by a runtime setting.
 - **settings.lua**: Declares all runtime-global settings for logging and retention.
 - **locale/en/config.cfg**: Localization for settings and UI.
+
+---
+
+## Multiplayer & Dedicated Server Compatibility
+- All persistent state is handled via the Factorio 2.0+ `storage` table, never a module-local variable or the legacy `global` table.
+- Event listeners that mutate persistent state are only registered in host-only entry points (`on_init`, `on_configuration_changed`), never in `on_load`.
+- Commands and remote interfaces are registered on all peers, including in `on_load`, per Factorio multiplayer best practices.
+- The mod is now fully compatible with multiplayer and dedicated servers, with no risk of state desynchronization.
+
+---
+
+## Migration Notes
+- **Factorio 2.0+ Migration:** All persistent data previously stored in `global` must be migrated to the new `storage` table. Any mutation of persistent state in `on_load` is now forbidden and will cause errors or desyncs.
+- See the [Persistent Storage Table Migration Guide](https://lua-api.factorio.com/2.0.45/auxiliary/storage.html) for details.
 
 ---
 
