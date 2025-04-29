@@ -1,3 +1,115 @@
-# Hivemind
+# Hivemind Mod: Developer Log & Technical Reference
 
-To be continued...
+## Purpose
+This document is a living developer log and technical reference for the Hivemind Factorio mod (v2.0+). It captures design intentions, architectural decisions, performance constraints, and lessons learned as development progresses. It is **not** an end-user guide, but a resource for current and future developers to understand the rationale behind every major component and pattern.
+
+---
+
+## Project Goals
+- **Efficient, safe, and lossless export of system events and stateful data** for external consumption (via RCON and other automated tools).
+- **Zero impact on Factorio's synchronous game loop:** All data collection, storage, and export must avoid stutters and maintain 60 UPS.
+- **Configurable and robust data retention:** Support high-frequency event logging with bounded memory usage.
+- **Extensible event architecture:** Designed to accommodate new event types and export needs with minimal refactoring.
+
+---
+
+## Key Design Principles
+- **Single-threaded Safety:**
+  - All logic must be safe to run in Factorio's single game thread. No operation should block or delay the simulation.
+  - Avoid large table traversals or complex computation in per-tick/event handlers.
+- **Persistent State:**
+  - All persistent state is stored in the `storage` table (never `global`, which is undefined in Factorio 2.0+).
+  - Storage helpers (see `modules/storage.lua`) encapsulate all access and mutation.
+- **Dynamic Configuration:**
+  - All runtime-global settings (e.g., event retention) are read live from `settings.global`.
+  - Never cache settings; always re-read to support live tuning.
+- **Minimal Logging Overhead:**
+  - Logging is controlled by a runtime setting. Only essential state changes, command invocations, and pruning actions are logged.
+  - Logs are output to the Factorio console (not to disk).
+- **Safe Command Registration:**
+  - Custom commands are always removed before registration to prevent duplicate errors during load/save cycles.
+- **Profiling and Performance Monitoring:**
+  - Use Factorio's built-in profiler and tick timing to validate performance (see `RCON.md` for profiling patterns).
+
+---
+
+## Module Overview
+- **control.lua**: Entrypoint; manages mod lifecycle, module initialization, and command/event registration.
+- **modules/storage.lua**: Persistent storage helpers; handles all event storage, pruning, and retrieval.
+- **modules/event_listener.lua**: Registers and handles relevant game events (e.g., enemy group attack decisions). Prunes old events and logs new ones.
+- **modules/commands.lua**: Registers and implements custom commands for data export and management.
+- **modules/logging.lua**: Centralized logging utility, controlled by a runtime setting.
+- **settings.lua**: Declares all runtime-global settings for logging and retention.
+- **locale/en/config.cfg**: Localization for settings and UI.
+
+---
+
+## Performance Constraints & Targets
+- **Event Handling:**
+  - Event handlers (e.g., `on_unit_group_finished_gathering`) must execute in under 1 ms per event, even under heavy load.
+  - All table traversals (e.g., pruning) are optimized to avoid full scans each tick.
+- **Pruning:**
+  - Pruning is triggered only when new events are stored, not on every tick.
+  - Retention window is user-configurable (default: 10 minutes at 60 UPS).
+- **Export:**
+  - Data export via commands is on-demand and does not block the simulation.
+- **Memory Usage:**
+  - All event data is pruned by age; no unbounded growth.
+- **RCON Safety:**
+  - All RCON and remote export tools must use `/silent-command` and `rcon.print` to avoid spamming player consoles (see `RCON.md`).
+
+---
+
+## Logging & Debugging
+- **What is logged:**
+  - Mod lifecycle events (init, load, config change)
+  - Event listener registration
+  - Command registration and invocation
+  - Attack event captures (with details)
+  - Pruning actions (count of events removed)
+  - Data drops via commands
+- **How to enable logging:**
+  - Set `hivemind_enable_logging` to `true` in runtime-global settings.
+- **Where logs go:**
+  - Factorio console (not to file). For persistent logs, use RCON or external tools.
+
+---
+
+## Extending the Mod
+- **Adding New Event Types:**
+  - Register new handlers in `event_listener.lua`, following the pattern for attack events.
+  - Ensure all new event data is stored via `storage` helpers and pruned appropriately.
+- **Adding Export Commands:**
+  - Define new commands in `commands.lua`.
+  - Always remove commands before re-registering.
+- **Profiling New Features:**
+  - Use the patterns in `RCON.md` to measure tick and ms cost of new handlers.
+
+---
+
+## Lessons Learned
+- **Never use `global` for persistent state in Factorio 2.0+.**
+- **Always re-read settings at runtime.**
+- **Batch or defer heavy work.**
+- **Profile early and often.**
+- **Design for bounded memory.**
+
+---
+
+## References
+- [Factorio Modding API Docs](https://lua-api.factorio.com/2.0.45/)
+- [Persistent Storage Table Migration Guide](https://lua-api.factorio.com/2.0.45/auxiliary/storage.html)
+- [RCON.md](RCON.md) — Profiling, remote command, and export patterns
+- [REFACTOR.md](REFACTOR.md) — Technical patterns and lessons
+
+---
+
+## TODO / Open Questions
+- [ ] Add support for additional system event types (e.g., chat, research, pollution)
+- [ ] Implement periodic summarization/export hooks
+- [ ] Evaluate memory and tick cost under extreme event rates
+- [ ] Document all new design decisions here as development continues
+
+---
+
+*This README should be updated with every major technical, architectural, or performance-related change to ensure continuity and clarity for all developers working on Hivemind.*
