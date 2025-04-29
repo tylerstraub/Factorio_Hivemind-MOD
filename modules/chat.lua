@@ -1,12 +1,15 @@
 -- modules/chat.lua
 local Chat           = {}
 
+-- Helper functions for runtime-global settings
 function Chat.get_retention_ticks()
-    local seconds = settings.global["hivemind_chat_retention_seconds"] and settings.global["hivemind_chat_retention_seconds"].value or 60
+    local s = settings.global["hivemind_chat_retention_seconds"]
+    local seconds = (s and s.value) or 60
     return seconds * 60
 end
 function Chat.get_max_messages()
-    return settings.global["hivemind_chat_max_messages"] and settings.global["hivemind_chat_max_messages"].value or 5
+    local s = settings.global["hivemind_chat_max_messages"]
+    return (s and s.value) or 5
 end
 
 local Util           = require("__Hivemind__/modules/util")

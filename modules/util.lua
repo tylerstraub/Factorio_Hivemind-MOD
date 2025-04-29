@@ -69,4 +69,32 @@ function Util.find_nearest_chart_tag(surface, force, position)
     return nearest_tag
 end
 
+-- Profiling helpers
+function Util.create_profiler()
+    return game.create_profiler and game.create_profiler() or nil
+end
+
+function Util.profile_section(profiler, logs, section)
+    if profiler then
+        -- Use empty string as first element for direct concat (Factorio log expects LocalisedString)
+        table.insert(logs, {"", string.format("%-15s", section) .. " = ", profiler})
+        profiler:reset()
+    end
+end
+
+function Util.log_profiling_if_enabled(logs, profiler, total_profiler)
+    local profiling_setting = settings.global["hivemind_enable_profiling_log"]
+    local profiling_enabled = profiling_setting and profiling_setting.value
+    if profiling_enabled and profiler then
+        log("--- Hivemind Profiling ---")
+        for _, msg in ipairs(logs) do
+            log(msg)
+        end
+        if total_profiler then
+            log({"", "TOTAL          = ", total_profiler})
+        end
+        log("-------------------------")
+    end
+end
+
 return Util

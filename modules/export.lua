@@ -61,17 +61,21 @@ local function summarize_event_groups(groups)
 end
 
 function Export.get_interval()
-    local seconds = settings.global["hivemind_export_interval_seconds"] and settings.global["hivemind_export_interval_seconds"].value or 1
+    local s = settings.global["hivemind_export_interval_seconds"]
+    local seconds = (s and s.value) or 1
     return seconds * 60
 end
 
 function Export.on_tick(event)
+    local total_profiler = Util.create_profiler()
+    local profiler = Util.create_profiler()
     local tick      = event.tick
     local game_time = Util.tick_to_time(tick)
+    local logs = {}
 
     -- prune old event groups
+    Util.profile_section(profiler, logs, "prune")
     Event.prune(tick)
-    -- prune old chat messages
     Chat.prune(tick)
 
     local surface               = game.surfaces["nauvis"]
@@ -79,6 +83,7 @@ function Export.on_tick(event)
     local pollution             = surface.get_pollution({ 0, 0 })
 
     -- Player turret counts
+    Util.profile_section(profiler, logs, "counts")
     local player_turrets        = {
         bullet    = surface.count_entities_filtered { type = "ammo-turret", force = "player" },
         laser     = surface.count_entities_filtered { type = "electric-turret", force = "player" },
@@ -89,10 +94,10 @@ function Export.on_tick(event)
         + player_turrets.laser
         + player_turrets.flame
         + player_turrets.artillery
-
     local player_research_queue = #game.forces["player"].research_queue
 
     -- Enemy entity counts
+    Util.profile_section(profiler, logs, "enemy_counts")
     local enemy_counts          = {
         spawners = surface.count_entities_filtered { type = "unit-spawner", force = "enemy" },
         worms    = {
@@ -124,10 +129,12 @@ function Export.on_tick(event)
     enemy_counts.spitters.total = sum(enemy_counts.spitters)
 
     -- Summarize & clear event groups
+    Util.profile_section(profiler, logs, "event_summary")
     local event_groups = Event.get_groups()
     local event_summary = summarize_event_groups(event_groups)
 
     -- Chat output
+    Util.profile_section(profiler, logs, "chat")
     local chat_out              = {}
     for _, msg in ipairs(storage.chat_messages or {}) do
         table.insert(chat_out, {
@@ -139,6 +146,7 @@ function Export.on_tick(event)
     end
 
     -- Get all player map tags for this surface for debug/export
+    Util.profile_section(profiler, logs, "tags")
     local map_tags = {}
     local player_tags = game.forces["player"].find_chart_tags(surface)
     for _, tag in ipairs(player_tags) do
@@ -149,6 +157,7 @@ function Export.on_tick(event)
     end
 
     -- Player advancement
+    Util.profile_section(profiler, logs, "advancement")
     local force = game.forces["player"]
     local total_tech, researched = 0, 0
     for _, tech in pairs(force.technologies) do
@@ -178,6 +187,7 @@ function Export.on_tick(event)
     }
 
     -- Final export
+    Util.profile_section(profiler, logs, "export_prep")
     local data        = {
         tick             = tick,
         game_time        = game_time,
@@ -202,9 +212,20 @@ function Export.on_tick(event)
     }
 
     -- Serialize, pretty-print, and write out
+    Util.profile_section(profiler, logs, "serialize")
     local json_min    = helpers.table_to_json(data)
     local json_pretty = Util.pretty_json(json_min)
     helpers.write_file("hivemind.json", json_pretty, false)
+
+    -- Always log profiling output if enabled in settings (or for dev/testing)
+    Util.log_profiling_if_enabled(logs, profiler, total_profiler)
+
+    -- Logging (server profile)
+    if game.is_multiplayer() and game.player == nil and profiler then
+        for _, msg in ipairs(logs) do
+            log(msg)
+        end
+    end
 end
 
 return Export

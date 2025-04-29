@@ -1,13 +1,15 @@
 -- modules/event.lua
 local Event           = {}
 
--- Helper functions for startup settings
+-- Helper functions for runtime-global settings
 function Event.get_retention_ticks()
-    local seconds = settings.global["hivemind_event_retention_seconds"] and settings.global["hivemind_event_retention_seconds"].value or 60
+    local s = settings.global["hivemind_event_retention_seconds"]
+    local seconds = (s and s.value) or 60
     return seconds * 60
 end
 function Event.get_max_groups()
-    return settings.global["hivemind_event_max_groups"] and settings.global["hivemind_event_max_groups"].value or 5
+    local s = settings.global["hivemind_event_max_groups"]
+    return (s and s.value) or 5
 end
 
 local Util            = require("__Hivemind__/modules/util")

@@ -26,6 +26,8 @@ Hivemind monitors game events, collects statistics about both player and enemy f
 
 The mod provides several settings to control its behavior:
 
+**All settings are runtime-global. Admins can change these at runtime from the server/mod settings menu, and changes take effect immediately without a restart.**
+
 | Setting              | Description                                | Default | Range  |
 | -------------------- | ------------------------------------------ | ------- | ------ |
 | Export Interval      | How often to export JSON data (seconds)    | 1       | 1-3600 |
