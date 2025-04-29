@@ -61,16 +61,38 @@ This document is a living developer log and technical reference for the Hivemind
 ### Commands
 - The following custom commands are available for interacting with stored attack events:
 
-#### `/get_attack_events <tick>`
+#### `/hm_get_events <tick>`
 - **Description:** Exports all attack events that occurred after the specified tick.
 - **Parameter:** `tick` (optional, defaults to 0) — Only events with `tick > <tick>` are returned.
-- **Usage Example:** `/get_attack_events 10000`
+- **Usage Example:** `/hm_get_events 10000`
 - **Output:** Events are printed to the console or RCON (for automated export).
+- **Admin Status:** Admin-only.
+- **Logging Status:** Command invocation and output are logged.
 
-#### `/drop_attack_events`
+#### `/hm_drop_events`
 - **Description:** Removes all stored attack events from persistent storage.
-- **Usage Example:** `/drop_attack_events`
+- **Usage Example:** `/hm_drop_events`
 - **Output:** Confirmation message and count of events dropped.
+- **Admin Status:** Admin-only.
+- **Logging Status:** Command invocation and output are logged.
+
+#### `/hm_reload_listeners`
+- **Description:** Reloads all Hivemind event listeners. Useful for maintenance or debugging; safe to call at any time.
+- **Usage Example:** `/hm_reload_listeners`
+- **Output:** Confirmation message.
+- **Admin Status:** Admin-only.
+- **Logging Status:** Command invocation and output are logged.
+
+#### `/hm_list_listeners`
+- **Description:** Lists all active Hivemind event listeners with their event names and IDs. This reflects the mod's internal handler table, not Factorio's runtime event registry.
+- **Usage Example:** `/hm_list_listeners`
+- **Output Example:**
+  ```
+  [Hivemind] Active registered listeners:
+  - on_unit_group_finished_gathering (ID: 156)
+  ```
+- **Admin Status:** Admin-only.
+- **Logging Status:** Command invocation and output are logged.
 
 ### Mod Settings (Runtime-Global)
 - `hivemind_event_retention_ticks`: Number of ticks to retain attack events (default: 36000, i.e., 10 minutes at 60 UPS)

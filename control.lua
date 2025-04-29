@@ -7,6 +7,11 @@ local commands_module = require("modules.commands")
 local logging = require("modules.logging")
 
 --- Initialize all modules and register event handlers/commands
+--  SAFE: Only call from server-only hooks (on_init, on_configuration_changed)
+--  - Initializes persistent storage
+--  - Registers state-mutating event handlers
+--  - Registers commands
+--  NEVER call from script.on_load (would desync multiplayer)
 local function initialize()
   logging.info("Hivemind mod initializing (on_init/config change)")
   storage.init()
@@ -14,17 +19,23 @@ local function initialize()
   commands_module.register()
 end
 
+--  SAFE: Called ONCE, server-only, when a new save is created or mod is added
+--  - Safe to initialize persistent state and register event handlers/commands
 script.on_init(function()
   initialize()
 end)
 
+--  SAFE: Called on every peer (server and all clients) when the mod loads
+--  - Only re-register event handlers and commands (NO persistent state mutation!)
+--  - Mutating storage here will desync multiplayer
 script.on_load(function()
   logging.info("Hivemind mod loading (on_load)")
-  -- Only registration is needed on load; do not re-init storage
-  event_listener.register()
+  -- Only registration is needed on load; do not re-init storage or register state-mutating event handlers here.
   commands_module.register()
 end)
 
+--  SAFE: Called on server when mods or versions change
+--  - Safe to migrate/init persistent state and re-register event handlers/commands
 script.on_configuration_changed(function()
   initialize()
 end)
