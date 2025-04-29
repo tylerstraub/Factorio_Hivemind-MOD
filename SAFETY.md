@@ -4,13 +4,13 @@
 > - Your mod is **first added** to a save that didn’t previously include it.  
 >  
 > **Use it (server-only) to:**  
-> - Initialize your persistent state (`global` tables).  
-> - Register all game-state event listeners (`script.on_event`) that mutate `global`.  
+> - Initialize your persistent state (`storage` tables).  
+> - Register all game-state event listeners (`script.on_event`) that mutate `storage`.  
 > - Register your slash commands/remote interfaces.  
 >  
 > ```lua
 > script.on_init(function()
->   storage.init()              -- set up global tables
+>   storage.init()              -- set up storage tables
 >   event_listener.register()   -- server-only game logic hooks
 >   commands.register()         -- server-only commands/interfaces
 > end)
@@ -24,7 +24,7 @@
 > - Mods or mod versions change (including your mod being added or upgraded mid-game).  
 >  
 > **Use it (server-only) to:**  
-> - Migrate or extend your `global` for new features.  
+> - Migrate or extend your `storage` for new features.  
 > - Re-register any new event listeners.  
 > - Re-register commands/interfaces if your API surface changed.  
 >  
@@ -47,10 +47,10 @@
 >  
 > **Use it (server + client) only for:**  
 > 1. **Re-registering event handlers** (so clients get the same `script.on_event` hooks).  
-> 2. **Restoring metatables** on data in `global`.  
+> 2. **Restoring metatables** on data in `storage`.  
 > 3. **Re-registering commands/remote interfaces** if needed for client usage.  
 >  
-> **Never** mutate `global` or perform server-only setup here—doing so on clients will desynchronize world state.  
+> **Never** mutate `storage` or perform server-only setup here—doing so on clients will desynchronize world state.  
 >  
 > ```lua
 > script.on_load(function()
@@ -105,7 +105,7 @@ end)
 ```
 
 ### Why this prevents desyncs
-- **Server-only state writes** live in `on_init`/`on_configuration_changed`—clients never execute those, so `global` stays identical.  
+- **Server-only state writes** live in `on_init`/`on_configuration_changed`—clients never execute those, so `storage` stays identical.  
 - **Handler wiring** in `on_load` runs everywhere, keeping client event hooks in sync without touching state.  
 - **Client joins** see no unexpected mutations, and the CRC checks pass every time.
 
