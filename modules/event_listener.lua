@@ -5,6 +5,14 @@ local storage = require("modules.storage")
 local logging = require("modules.logging")
 local event_listener = {}
 
+-- Helper to prune, store, and log event data
+local function prune_store_log(table_name, setting_key, event_tick, retention_default, data, log_label, log_message)
+  local retention = settings.global[setting_key] and settings.global[setting_key].value or retention_default
+  storage.prune_table(table_name, event_tick, retention, log_label)
+  storage.store_item(table_name, event_tick, data)
+  logging.info(log_message)
+end
+
 -- Central registry for all event types and their handlers
 -- IMPORTANT: Registration order must be deterministic for multiplayer safety.
 -- Always use arrays + ipairs, or sort keys before iterating with pairs.
@@ -13,8 +21,6 @@ event_listener.handlers = {
   [defines.events.on_unit_group_finished_gathering] = function(event)
     local group = event.group
     if group and group.valid and group.force and group.force.name == "enemy" then
-      local retention = settings.global["hivemind_attack_event_retention_ticks"] and settings.global["hivemind_attack_event_retention_ticks"].value or 36000
-      storage.prune_table("attack_events", event.tick, retention, "attack event")
       local cmd = group.command
       local cmd_type = cmd and cmd.type
       local target_pos = cmd and cmd.destination
@@ -29,8 +35,15 @@ event_listener.handlers = {
         size = #group.members,
         event_name = event.name,
       }
-      storage.store_item("attack_events", event.tick, data)
-      logging.info("Enemy group attack decision: tick=" .. event.tick .. ", group=" .. tostring(group.unique_id) .. ", command=" .. tostring(cmd_type) .. ", target=" .. (target_pos and ("{"..target_pos.x..","..target_pos.y.."}") or "nil") .. ", size=" .. tostring(data.size))
+      prune_store_log(
+        "attack_events",
+        "hivemind_attack_event_retention_ticks",
+        event.tick,
+        36000,
+        data,
+        "attack event",
+        "Enemy group attack decision: tick=" .. event.tick .. ", group=" .. tostring(group.unique_id) .. ", command=" .. tostring(cmd_type) .. ", target=" .. (target_pos and ("{"..target_pos.x..","..target_pos.y.."}") or "nil") .. ", size=" .. tostring(data.size)
+      )
     end
   end,
   [defines.events.on_console_chat] = function(event)
@@ -39,8 +52,6 @@ event_listener.handlers = {
       local p = game.get_player(event.player_index)
       if p then player = p.name end
     end
-    local retention = settings.global["hivemind_chat_message_retention_ticks"] and settings.global["hivemind_chat_message_retention_ticks"].value or 36000
-    storage.prune_table("chat_messages", event.tick, retention, "chat message")
     local chat = {
       tick = event.tick,
       player = player,
@@ -48,8 +59,15 @@ event_listener.handlers = {
       message = event.message,
       event_name = event.name,
     }
-    storage.store_item("chat_messages", event.tick, chat)
-    logging.info("Chat message captured: tick=" .. tostring(event.tick) .. ", player=" .. tostring(player) .. ", message=" .. tostring(event.message))
+    prune_store_log(
+      "chat_messages",
+      "hivemind_chat_message_retention_ticks",
+      event.tick,
+      36000,
+      chat,
+      "chat message",
+      "Chat message captured: tick=" .. tostring(event.tick) .. ", player=" .. tostring(player) .. ", message=" .. tostring(event.message)
+    )
   end,
 }
 
