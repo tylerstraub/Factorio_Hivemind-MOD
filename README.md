@@ -72,6 +72,7 @@ end
 - **modules/commands.lua**: Registers and implements custom commands for data export and management.
 - **modules/logging.lua**: Centralized logging utility, controlled by a runtime setting.
 - **modules/remote_interface.lua**: Centralized registration of the `hivemind` remote interface. Exposes storage and event data for RCON, console, and inter-mod access. All exported remote functions are logged, and all data serialization uses the global `helpers.table_to_json` (never require or import helpers). Now also exposes chat message data, clearing functions, and supports full storage snapshots for export and integration testing.
+  - **Note:** All remote interface functions for storage tables (e.g., `get_attack_events_after`, `clear_attack_events`) are now generated automatically from a central list in `modules/remote_interface.lua`. To expose a new event type, simply add its table name to the `STORAGE_TABLES` list. The remote interface and all documentation examples will remain valid and up to date.
 - **settings.lua**: Declares all runtime-global settings for logging and retention. Now includes separate retention settings for attack events and chat messages.
 - **locale/en/config.cfg**: Localization for settings and UI. Now includes chat message retention settings.
 
@@ -166,6 +167,7 @@ The following custom commands are available for interacting with stored events:
   - `clear_chat_messages()`: Clears all stored chat messages.
   - `get_storage_snapshot(tick)`: Returns a single JSON object containing all tracked storage tables (attack events, chat messages, etc.) after the given tick. Useful for integration tests and bulk export.
   - All results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
+  - **Note:** If new storage tables are added to the mod, corresponding `get_<table>_after` and `clear_<table>` functions will be available automatically via the remote interface, with no further code changes required.
 - **Usage Example (RCON/Console):**
   ```
   /c remote.call("hivemind", "get_attack_events_after", 1000)

@@ -7,59 +7,35 @@ local logging = require("modules.logging")
 
 local M = {}
 
---- Returns all attack events after the given tick
--- @param tick [number]: Only events after this tick are returned
--- @return [string]: JSON string of attack events keyed by tick
-local function get_attack_events_after(tick)
-  logging.info("[remote_interface] get_attack_events_after called with tick=" .. tostring(tick))
-  local result = storage.get_items_after("attack_events", tick)
+-- List of storage tables to export via remote interface
+local STORAGE_TABLES = {"attack_events", "chat_messages"}
+
+-- Helper: DRY getter for events/messages after tick
+local function get_items_after(table_name, tick)
+  logging.info("[remote_interface] get_" .. table_name .. "_after called with tick=" .. tostring(tick))
+  local result = storage.get_items_after(table_name, tick)
   local json = helpers.table_to_json(result)
-  logging.info("[remote_interface] get_attack_events_after result: " .. json)
+  logging.info("[remote_interface] get_" .. table_name .. "_after result: " .. json)
   if rcon then rcon.print(json) end
   return json
 end
 
---- Clears all attack events (use with caution)
--- @return [string]: JSON status string
-local function clear_attack_events()
-  logging.info("[remote_interface] clear_attack_events called, clearing all events")
-  storage.clear_table("attack_events")
+-- Helper: DRY clearer for tables
+local function clear_items(table_name)
+  logging.info("[remote_interface] clear_" .. table_name .. " called, clearing all items")
+  storage.clear_table(table_name)
   if rcon then rcon.print('{"status":"cleared"}') end
   return '{"status":"cleared"}'
 end
 
---- Returns all chat messages after the given tick
--- @param tick [number]: Only messages after this tick are returned
--- @return [string]: JSON string of chat messages keyed by tick
-local function get_chat_messages_after(tick)
-  logging.info("[remote_interface] get_chat_messages_after called with tick=" .. tostring(tick))
-  local result = storage.get_items_after("chat_messages", tick)
-  local json = helpers.table_to_json(result)
-  logging.info("[remote_interface] get_chat_messages_after result: " .. json)
-  if rcon then rcon.print(json) end
-  return json
-end
-
---- Clears all chat messages (use with caution)
--- @return [string]: JSON status string
-local function clear_chat_messages()
-  logging.info("[remote_interface] clear_chat_messages called, clearing all chat messages")
-  storage.clear_table("chat_messages")
-  if rcon then rcon.print('{"status":"cleared"}') end
-  return '{"status":"cleared"}'
-end
-
---- Returns a snapshot of all storage tables after the given tick (extend as needed)
--- @param tick [number]: Only items after this tick are returned for each table (default 0)
--- @return [string]: JSON string of storage tables
+-- Returns a snapshot of all storage tables after the given tick
 local function get_storage_snapshot(tick)
   tick = tonumber(tick) or 0
   logging.info("[remote_interface] get_storage_snapshot called with tick=" .. tostring(tick))
-  local snapshot = {
-    attack_events = storage.get_items_after("attack_events", tick),
-    chat_messages = storage.get_items_after("chat_messages", tick),
-    -- Add more storage tables here as needed
-  }
+  local snapshot = {}
+  for _, table_name in ipairs(STORAGE_TABLES) do
+    snapshot[table_name] = storage.get_items_after(table_name, tick)
+  end
   local json = helpers.table_to_json(snapshot)
   logging.info("[remote_interface] get_storage_snapshot result: " .. json)
   if rcon then rcon.print(json) end
@@ -68,14 +44,17 @@ end
 
 --- Registers the remote interface for Hivemind
 function M.register()
-  remote.add_interface("hivemind", {
-    get_attack_events_after = get_attack_events_after,
-    clear_attack_events = clear_attack_events,
+  -- Build the interface table deterministically
+  local interface = {
     get_storage_snapshot = get_storage_snapshot,
-    get_chat_messages_after = get_chat_messages_after,
-    clear_chat_messages = clear_chat_messages,
-    -- Add more exported functions here as the mod grows
-  })
+  }
+  -- Add getter/clearer for each storage table (sorted order for multiplayer safety)
+  table.sort(STORAGE_TABLES)
+  for _, table_name in ipairs(STORAGE_TABLES) do
+    interface["get_" .. table_name .. "_after"] = function(tick) return get_items_after(table_name, tick) end
+    interface["clear_" .. table_name] = function() return clear_items(table_name) end
+  end
+  remote.add_interface("hivemind", interface)
   logging.info("[remote_interface] Registered 'hivemind' remote interface.")
 end
 
