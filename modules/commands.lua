@@ -4,6 +4,7 @@
 local storage = require("modules.storage")
 local logging = require("modules.logging")
 local event_listener = require("modules.event_listener")
+local command_handlers = require("modules.command_handlers")
 local commands_module = {}
 
 local function is_admin(cmd)
@@ -48,107 +49,26 @@ function commands_module.register()
       desc = "Get a summary of all stored events after a tick (by type).",
       admin_only = true,
       handler = function(cmd)
-        local tick = tonumber(cmd.parameter) or 0
-        local events = storage.get_items_after("attack_events", tick)
-        local chat_messages = storage.get_items_after("chat_messages", tick)
-        -- Use event_id_to_name for readable names
-        local counts = {}
-        -- Summarize attack events
-        for _, bucket in pairs(events) do
-          for _, event in ipairs(bucket) do
-            local name = event.event_name
-            if name then
-              -- Convert numeric event name to string if needed
-              if event_id_to_name[name] then
-                name = event_id_to_name[name]
-              end
-              counts[name] = (counts[name] or 0) + 1
-            else
-              counts["unknown"] = (counts["unknown"] or 0) + 1
-            end
-          end
-        end
-        -- Summarize chat messages (if any)
-        if chat_messages and type(chat_messages) == "table" then
-          local chat_count = 0
-          for _, bucket in pairs(chat_messages) do
-            chat_count = chat_count + #bucket
-          end
-          if chat_count > 0 then
-            counts["on_console_chat"] = chat_count
-          end
-        end
-        local lines = {"[Hivemind] Event summary after tick " .. tick .. ":"}
-        local event_count = 0
-        for event_name, count in pairs(counts) do
-          table.insert(lines, "- " .. event_name .. ": " .. count)
-          event_count = event_count + count
-        end
-        if event_count == 0 then
-          lines = {"[Hivemind] No events stored after tick " .. tick .. "."}
-        end
-        local output = table.concat(lines, "\n")
-        logging.info("/hm_get_events called by " .. (cmd.player_index and ("player " .. cmd.player_index) or "server") .. ", tick=" .. tick)
-        logging.info("/hm_get_events summary returned: " .. output)
-        if cmd.player_index then
-          game.players[cmd.player_index].print(output)
-        else
-          game.print(output)
-        end
+        command_handlers.get_events(cmd, event_id_to_name)
       end
     },
     {
       name = "hm_drop_events",
       desc = "Delete all stored events (debug only)",
       admin_only = true,
-      handler = function(cmd)
-        storage.clear_table("attack_events")
-        storage.clear_table("chat_messages")
-        logging.info("/hm_drop_events called by " .. (cmd.player_index and ("player " .. cmd.player_index) or "server"))
-        logging.info("All event data dropped via /hm_drop_events command")
-        if cmd.player_index then
-          game.players[cmd.player_index].print("All event data dropped.")
-        else
-          game.print("All event data dropped.")
-        end
-      end
+      handler = command_handlers.drop_events
     },
     {
       name = "hm_list_listeners",
       desc = "List all active Hivemind event listeners (admin only)",
       admin_only = true,
-      handler = function(cmd)
-        local event_id_to_name = build_event_id_to_name()
-        local handlers = event_listener.handlers
-        local lines = {"[Hivemind] Active registered listeners:"}
-        for event_id, _ in pairs(handlers) do
-          local event_name = event_id_to_name[event_id] or "(unknown)"
-          table.insert(lines, "- " .. event_name .. " (ID: " .. tostring(event_id) .. ")")
-        end
-        local msg = table.concat(lines, "\n")
-        logging.info("/hm_list_listeners called by " .. (cmd.player_index and ("player " .. cmd.player_index) or "server"))
-        logging.info("[Hivemind] Listeners reported: " .. msg)
-        if cmd.player_index then
-          game.players[cmd.player_index].print(msg)
-        else
-          game.print(msg)
-        end
-      end
+      handler = command_handlers.list_listeners
     },
     {
       name = "hm_reload_listeners",
       desc = "Reload all Hivemind event listeners (admin only)",
       admin_only = true,
-      handler = function(cmd)
-        event_listener.register()
-        logging.info("/hm_reload_listeners called by " .. (cmd.player_index and ("player " .. cmd.player_index) or "server"))
-        logging.info("[Hivemind] Event listeners reloaded via /hm_reload_listeners command.")
-        if cmd.player_index then
-          game.players[cmd.player_index].print("[Hivemind] Event listeners reloaded.")
-        else
-          game.print("[Hivemind] Event listeners reloaded.")
-        end
-      end
+      handler = command_handlers.reload_listeners
     },
   }
 

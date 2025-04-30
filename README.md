@@ -70,6 +70,7 @@ end
 - **modules/storage.lua**: Persistent storage helpers; handles all event storage, pruning, and retrieval. All persistent data is stored directly in the Factorio `storage` table, ensuring compatibility with multiplayer and dedicated servers.
 - **modules/event_listener.lua**: Registers and handles relevant game events (e.g., enemy group attack decisions, chat messages). Prunes old events and logs new ones.
 - **modules/commands.lua**: Registers and implements custom commands for data export and management.
+- **modules/command_handlers.lua**: Contains all handler functions for custom commands. Each command's logic is implemented as a dedicated function here for clarity and maintainability.
 - **modules/logging.lua**: Centralized logging utility, controlled by a runtime setting.
 - **modules/remote_interface.lua**: Centralized registration of the `hivemind` remote interface. Exposes storage and event data for RCON, console, and inter-mod access. All exported remote functions are logged, and all data serialization uses the global `helpers.table_to_json` (never require or import helpers). Now also exposes chat message data, clearing functions, and supports full storage snapshots for export and integration testing.
   - **Note:** All remote interface functions for storage tables (e.g., `get_attack_events_after`, `clear_attack_events`) are now generated automatically from a central list in `modules/remote_interface.lua`. To expose a new event type, simply add its table name to the `STORAGE_TABLES` list. The remote interface and all documentation examples will remain valid and up to date.
@@ -234,7 +235,8 @@ The following custom commands are available for interacting with stored events:
   - Register new handlers in `event_listener.lua`, following the pattern for attack events.
   - Ensure all new event data is stored directly via the `storage` table and pruned appropriately.
 - **Adding Export Commands:**
-  - Define new commands in `commands.lua`.
+  - Define new command handler functions in `modules/command_handlers.lua`.
+  - Reference the handler in the registration table in `modules/commands.lua`.
   - Always remove commands before re-registering.
 - **Profiling New Features:**
   - Use the patterns in `RCON.md` to measure tick and ms cost of new handlers.
