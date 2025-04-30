@@ -14,7 +14,7 @@ event_listener.handlers = {
     local group = event.group
     if group and group.valid and group.force and group.force.name == "enemy" then
       local retention = settings.global["hivemind_attack_event_retention_ticks"] and settings.global["hivemind_attack_event_retention_ticks"].value or 36000
-      storage.prune_events(event.tick, retention)
+      storage.prune_table("attack_events", event.tick, retention, "attack event")
       local cmd = group.command
       local cmd_type = cmd and cmd.type
       local target_pos = cmd and cmd.destination
@@ -29,7 +29,7 @@ event_listener.handlers = {
         size = #group.members,
         event_name = event.name,
       }
-      storage.store_event(event.tick, data)
+      storage.store_item("attack_events", event.tick, data)
       logging.info("Enemy group attack decision: tick=" .. event.tick .. ", group=" .. tostring(group.unique_id) .. ", command=" .. tostring(cmd_type) .. ", target=" .. (target_pos and ("{"..target_pos.x..","..target_pos.y.."}") or "nil") .. ", size=" .. tostring(data.size))
     end
   end,
@@ -40,7 +40,7 @@ event_listener.handlers = {
       if p then player = p.name end
     end
     local retention = settings.global["hivemind_chat_message_retention_ticks"] and settings.global["hivemind_chat_message_retention_ticks"].value or 36000
-    storage.prune_chat_messages(event.tick, retention)
+    storage.prune_table("chat_messages", event.tick, retention, "chat message")
     local chat = {
       tick = event.tick,
       player = player,
@@ -48,7 +48,7 @@ event_listener.handlers = {
       message = event.message,
       event_name = event.name,
     }
-    storage.store_chat_message(event.tick, chat)
+    storage.store_item("chat_messages", event.tick, chat)
     logging.info("Chat message captured: tick=" .. tostring(event.tick) .. ", player=" .. tostring(player) .. ", message=" .. tostring(event.message))
   end,
 }

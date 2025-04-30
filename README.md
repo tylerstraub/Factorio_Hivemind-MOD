@@ -71,7 +71,7 @@ end
 - **modules/event_listener.lua**: Registers and handles relevant game events (e.g., enemy group attack decisions, chat messages). Prunes old events and logs new ones.
 - **modules/commands.lua**: Registers and implements custom commands for data export and management.
 - **modules/logging.lua**: Centralized logging utility, controlled by a runtime setting.
-- **modules/remote_interface.lua**: Centralized registration of the `hivemind` remote interface. Exposes storage and event data for RCON, console, and inter-mod access. All exported remote functions are logged, and all data serialization uses the global `helpers.table_to_json` (never require or import helpers). Now also exposes chat message data and clearing functions.
+- **modules/remote_interface.lua**: Centralized registration of the `hivemind` remote interface. Exposes storage and event data for RCON, console, and inter-mod access. All exported remote functions are logged, and all data serialization uses the global `helpers.table_to_json` (never require or import helpers). Now also exposes chat message data, clearing functions, and supports full storage snapshots for export and integration testing.
 - **settings.lua**: Declares all runtime-global settings for logging and retention. Now includes separate retention settings for attack events and chat messages.
 - **locale/en/config.cfg**: Localization for settings and UI. Now includes chat message retention settings.
 
@@ -80,7 +80,10 @@ end
 ## Event Storage & Commands
 
 ### Event Storage
-- **Event Types:** The mod tracks and stores multiple event types, including enemy attack group events (from `on_unit_group_finished_gathering`) and chat messages (from `on_console_chat`). The architecture is extensible to support additional event types as needed.
+- **Event Types:** The mod tracks and stores multiple event types:
+  - **Attack events** (from `on_unit_group_finished_gathering`)
+  - **Chat messages** (from `on_console_chat`)
+  - (Architecture is extensible for additional event types such as research, pollution, etc.)
 - **Storage:**
   - **Attack events** are stored in `storage.attack_events` as a table keyed by game tick. Each event contains:
     - `tick`: Game tick when the event occurred
@@ -93,7 +96,7 @@ end
     - `message`: The chat message
     - `event_name`: The event ID (`defines.events.on_console_chat`)
 - **Retention/Pruning:**
-  - Old events and messages are pruned automatically when new ones are stored.
+  - Old events and messages are pruned automatically **when new events are stored** (not on every tick).
   - The retention window (in ticks) is configurable via mod settings (see below).
   - Pruning ensures memory usage remains bounded.
 
@@ -161,11 +164,13 @@ The following custom commands are available for interacting with stored events:
   - `get_chat_messages_after(tick)`: Returns all chat messages after the given tick as a JSON string, bucketed by tick.
   - `clear_attack_events()`: Clears all stored attack events.
   - `clear_chat_messages()`: Clears all stored chat messages.
+  - `get_storage_snapshot(tick)`: Returns a single JSON object containing all tracked storage tables (attack events, chat messages, etc.) after the given tick. Useful for integration tests and bulk export.
   - All results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
 - **Usage Example (RCON/Console):**
   ```
   /c remote.call("hivemind", "get_attack_events_after", 1000)
   /c remote.call("hivemind", "get_chat_messages_after", 1000)
+  /c remote.call("hivemind", "get_storage_snapshot", 1000)
   /c remote.call("hivemind", "clear_attack_events")
   /c remote.call("hivemind", "clear_chat_messages")
   ```
