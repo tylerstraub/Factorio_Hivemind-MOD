@@ -17,5 +17,14 @@ data:extend({
     minimum_value = 600,
     maximum_value = 1000000,
     order = "b"
+  },
+  {
+    type = "int-setting",
+    name = "hivemind_chat_message_retention_ticks",
+    setting_type = "runtime-global",
+    default_value = 36000,
+    minimum_value = 600,
+    maximum_value = 1000000,
+    order = "c"
   }
 })

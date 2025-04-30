@@ -28,6 +28,27 @@ local function clear_attack_events()
   return '{"status":"cleared"}'
 end
 
+--- Returns all chat messages after the given tick
+-- @param tick [number]: Only messages after this tick are returned
+-- @return [string]: JSON string of chat messages keyed by tick
+local function get_chat_messages_after(tick)
+  logging.info("[remote_interface] get_chat_messages_after called with tick=" .. tostring(tick))
+  local result = storage.get_chat_messages_after(tick)
+  local json = helpers.table_to_json(result)
+  logging.info("[remote_interface] get_chat_messages_after result: " .. json)
+  if rcon then rcon.print(json) end
+  return json
+end
+
+--- Clears all chat messages (use with caution)
+-- @return [string]: JSON status string
+local function clear_chat_messages()
+  logging.info("[remote_interface] clear_chat_messages called, clearing all chat messages")
+  storage.clear_chat_messages()
+  if rcon then rcon.print('{"status":"cleared"}') end
+  return '{"status":"cleared"}'
+end
+
 --- Returns a snapshot of all storage tables (extend as needed)
 -- @return [string]: JSON string of storage tables
 local function get_storage_snapshot()
@@ -48,6 +69,8 @@ function M.register()
     get_attack_events_after = get_attack_events_after,
     clear_attack_events = clear_attack_events,
     get_storage_snapshot = get_storage_snapshot,
+    get_chat_messages_after = get_chat_messages_after,
+    clear_chat_messages = clear_chat_messages,
     -- Add more exported functions here as the mod grows
   })
   logging.info("[remote_interface] Registered 'hivemind' remote interface.")

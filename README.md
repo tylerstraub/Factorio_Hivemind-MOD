@@ -68,12 +68,12 @@ end
 ## Module Overview
 - **control.lua**: Entrypoint; manages mod lifecycle, module initialization, and command/event registration.
 - **modules/storage.lua**: Persistent storage helpers; handles all event storage, pruning, and retrieval. All persistent data is stored directly in the Factorio `storage` table, ensuring compatibility with multiplayer and dedicated servers.
-- **modules/event_listener.lua**: Registers and handles relevant game events (e.g., enemy group attack decisions). Prunes old events and logs new ones.
+- **modules/event_listener.lua**: Registers and handles relevant game events (e.g., enemy group attack decisions, chat messages). Prunes old events and logs new ones.
 - **modules/commands.lua**: Registers and implements custom commands for data export and management.
 - **modules/logging.lua**: Centralized logging utility, controlled by a runtime setting.
-- **modules/remote_interface.lua**: Centralized registration of the `hivemind` remote interface. Exposes storage and event data for RCON, console, and inter-mod access. All exported remote functions are logged, and all data serialization uses the global `helpers.table_to_json` (never require or import helpers).
-- **settings.lua**: Declares all runtime-global settings for logging and retention.
-- **locale/en/config.cfg**: Localization for settings and UI.
+- **modules/remote_interface.lua**: Centralized registration of the `hivemind` remote interface. Exposes storage and event data for RCON, console, and inter-mod access. All exported remote functions are logged, and all data serialization uses the global `helpers.table_to_json` (never require or import helpers). Now also exposes chat message data and clearing functions.
+- **settings.lua**: Declares all runtime-global settings for logging and retention. Now includes separate retention settings for attack events and chat messages.
+- **locale/en/config.cfg**: Localization for settings and UI. Now includes chat message retention settings.
 
 ---
 
@@ -127,9 +127,40 @@ end
 - **Logging Status:** Command invocation and output are logged.
 
 ### Mod Settings (Runtime-Global)
-- `hivemind_event_retention_ticks`: Number of ticks to retain attack events (default: 36000, i.e., 10 minutes at 60 UPS)
+- `hivemind_attack_event_retention_ticks`: Number of ticks to retain attack events (default: 36000, i.e., 10 minutes at 60 UPS)
 - `hivemind_enable_logging`: Enables or disables verbose logging of event and command activity
 - These settings can be changed in the mod settings GUI at runtime.
+
+---
+
+## Chat Message Storage & Remote Interface
+
+### Chat Message Storage
+- **Event Type:** The mod tracks and stores all chat messages sent in-game (from `on_console_chat`).
+- **Storage:** Messages are stored in `storage.chat_messages` as a table keyed by game tick. Each message contains:
+  - `tick`: Game tick when the message was sent
+  - `player`: Player name (if available)
+  - `player_index`: Player index (if available)
+  - `message`: The chat message
+  - `event_name`: The event ID (`defines.events.on_console_chat`)
+- **Retention/Pruning:**
+  - Old messages are pruned automatically when new messages are stored.
+  - The retention window (in ticks) is configurable via mod settings (`hivemind_chat_message_retention_ticks`).
+  - Pruning ensures memory usage remains bounded.
+
+### Remote Interface
+- The following remote interface functions are available for chat messages:
+  - `get_chat_messages_after(tick)`: Returns all chat messages after the given tick as a JSON string, bucketed by tick. Results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
+  - `clear_chat_messages()`: Clears all stored chat messages. Returns and prints a JSON status string to RCON.
+- **Usage Example (RCON/Console):**
+  ```
+  /c remote.call("hivemind", "get_chat_messages_after", 1000)
+  /c remote.call("hivemind", "clear_chat_messages")
+  ```
+- **Retention Setting:**
+  - `hivemind_chat_message_retention_ticks`: Number of ticks to retain chat messages (default: 36000, i.e., 10 minutes at 60 UPS)
+- **Localization:**
+  - Setting and description are localized in `locale/en/config.cfg`.
 
 ---
 
@@ -140,13 +171,15 @@ end
 - **Registration:** The interface is registered at the top-level of `control.lua` to guarantee availability for RCON, console, and other mods, per Factorio 2.0+ requirements.
 - **Exposed Functions:**
   - `get_attack_events_after(tick)`: Returns all attack events after the given tick as a JSON string. Results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
-  - `clear_attack_events()`: Clears all stored attack events. Returns and prints a JSON status string to RCON.
   - `get_storage_snapshot()`: Returns a snapshot of all storage tables (currently just attack events) as a JSON string. Results are logged, serialized, and sent to RCON.
+  - `get_chat_messages_after(tick)`: Returns all chat messages after the given tick as a JSON string. Results are logged, serialized, and sent to RCON.
+  - `clear_chat_messages()`: Clears all stored chat messages. Returns and prints a JSON status string to RCON.
 - **Usage Example (RCON/Console):**
   ```
   /c remote.call("hivemind", "get_attack_events_after", 1000)
-  /c remote.call("hivemind", "clear_attack_events")
   /c remote.call("hivemind", "get_storage_snapshot")
+  /c remote.call("hivemind", "get_chat_messages_after", 1000)
+  /c remote.call("hivemind", "clear_chat_messages")
   ```
 - **helpers Usage:** Always use the global `helpers.table_to_json` for serialization. Never require or import helpers; it is a global provided by Factorio 2.0+.
 - **RCON Data Transport:** All remote interface functions print their JSON result to RCON using `rcon.print`. This is the only supported use case; the returned value is always a JSON string for machine consumption.
@@ -173,8 +206,8 @@ end
   - Event handlers (e.g., `on_unit_group_finished_gathering`) must execute in under 1 ms per event, even under heavy load.
   - All table traversals (e.g., pruning) are optimized to avoid full scans each tick.
 - **Pruning:**
-  - Pruning is triggered only when new events are stored, not on every tick.
-  - Retention window is user-configurable (default: 10 minutes at 60 UPS).
+  - Pruning is triggered only when new events or chat messages are stored, not on every tick.
+  - Retention window is user-configurable (default: 10 minutes at 60 UPS) for both event types.
 - **Export:**
   - Data export via commands is on-demand and does not block the simulation.
 - **Memory Usage:**
@@ -189,7 +222,7 @@ end
   - Mod lifecycle events (init, load, config change)
   - Event listener registration
   - Command registration and invocation
-  - Attack event captures (with details)
+  - Attack event and chat message captures (with details)
   - Pruning actions (count of events removed)
   - Data drops via commands
 - **How to enable logging:**
@@ -229,7 +262,8 @@ end
 ---
 
 ## TODO / Open Questions
-- [ ] Add support for additional system event types (e.g., chat, research, pollution)
+- [x] Add support for chat message storage and remote interface functions.
+- [ ] Add support for additional system event types (e.g., research, pollution)
 - [ ] Implement periodic summarization/export hooks
 - [ ] Evaluate memory and tick cost under extreme event rates
 - [ ] Document all new design decisions here as development continues

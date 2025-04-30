@@ -33,6 +33,24 @@ event_listener.handlers = {
       logging.info("Enemy group attack decision: tick=" .. event.tick .. ", group=" .. tostring(group.unique_id) .. ", command=" .. tostring(cmd_type) .. ", target=" .. (target_pos and ("{"..target_pos.x..","..target_pos.y.."}") or "nil") .. ", size=" .. tostring(data.size))
     end
   end,
+  [defines.events.on_console_chat] = function(event)
+    local player = nil
+    if event.player_index then
+      local p = game.get_player(event.player_index)
+      if p then player = p.name end
+    end
+    local retention = settings.global["hivemind_chat_message_retention_ticks"] and settings.global["hivemind_chat_message_retention_ticks"].value or 36000
+    storage.prune_chat_messages(event.tick, retention)
+    local chat = {
+      tick = event.tick,
+      player = player,
+      player_index = event.player_index,
+      message = event.message,
+      event_name = event.name,
+    }
+    storage.store_chat_message(event.tick, chat)
+    logging.info("Chat message captured: tick=" .. tostring(event.tick) .. ", player=" .. tostring(player) .. ", message=" .. tostring(event.message))
+  end,
 }
 
 --- Register all relevant event handlers (modular)
