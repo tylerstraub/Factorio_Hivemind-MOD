@@ -75,6 +75,7 @@ end
 
 function M.clear_events()
   storage.attack_events = {}
+  storage.chat_messages = {}
 end
 
 -- Chat message storage helpers

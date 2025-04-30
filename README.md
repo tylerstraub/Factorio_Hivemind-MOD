@@ -77,34 +77,50 @@ end
 
 ---
 
-## Attack Event Storage & Commands
+## Event Storage & Commands
 
-### Attack Event Storage
-- **Event Type:** The mod tracks and stores enemy attack group events (from `on_unit_group_finished_gathering`).
-- **Storage:** Events are stored in `storage.attack_events` as a table keyed by game tick. Each event contains:
-  - `tick`: Game tick when the event occurred
-  - `group_id`: Unique ID of the enemy unit group
-  - (Additional fields may be added as needed)
+### Event Storage
+- **Event Types:** The mod tracks and stores multiple event types, including enemy attack group events (from `on_unit_group_finished_gathering`) and chat messages (from `on_console_chat`). The architecture is extensible to support additional event types as needed.
+- **Storage:**
+  - **Attack events** are stored in `storage.attack_events` as a table keyed by game tick. Each event contains:
+    - `tick`: Game tick when the event occurred
+    - `group_id`: Unique ID of the enemy unit group
+    - (Additional fields may be added as needed)
+  - **Chat messages** are stored in `storage.chat_messages` as a table keyed by game tick. Each message contains:
+    - `tick`: Game tick when the message was sent
+    - `player`: Player name (if available)
+    - `player_index`: Player index (if available)
+    - `message`: The chat message
+    - `event_name`: The event ID (`defines.events.on_console_chat`)
 - **Retention/Pruning:**
-  - Old events are pruned automatically when new events are stored.
+  - Old events and messages are pruned automatically when new ones are stored.
   - The retention window (in ticks) is configurable via mod settings (see below).
   - Pruning ensures memory usage remains bounded.
 
 ### Commands
-- The following custom commands are available for interacting with stored attack events:
+The following custom commands are available for interacting with stored events:
 
 #### `/hm_get_events <tick>`
-- **Description:** Exports all attack events that occurred after the specified tick.
-- **Parameter:** `tick` (optional, defaults to 0) — Only events with `tick > <tick>` are returned.
+- **Description:** Prints a summary of all stored events (by type and count) that occurred after the specified tick. This includes attack events, chat messages, and any other tracked event types.
+- **Parameter:** `tick` (optional, defaults to 0) — Only events with `tick > <tick>` are summarized.
 - **Usage Example:** `/hm_get_events 10000`
-- **Output:** Events are printed to the console or RCON (for automated export).
+- **Output Example:**
+  ```
+  [Hivemind] Event summary after tick 10000:
+  - on_unit_group_finished_gathering: 5
+  - on_console_chat: 1
+  ```
+  If no events are stored after the specified tick:
+  ```
+  [Hivemind] No events stored after tick 10000.
+  ```
 - **Admin Status:** Admin-only.
 - **Logging Status:** Command invocation and output are logged.
 
 #### `/hm_drop_events`
-- **Description:** Removes all stored attack events from persistent storage.
+- **Description:** Removes all stored events (attack events, chat messages, and any future event types) from persistent storage.
 - **Usage Example:** `/hm_drop_events`
-- **Output:** Confirmation message and count of events dropped.
+- **Output:** Confirmation message indicating all event data has been dropped.
 - **Admin Status:** Admin-only.
 - **Logging Status:** Command invocation and output are logged.
 
@@ -122,45 +138,16 @@ end
   ```
   [Hivemind] Active registered listeners:
   - on_unit_group_finished_gathering (ID: 156)
+  - on_console_chat (ID: 83)
   ```
 - **Admin Status:** Admin-only.
 - **Logging Status:** Command invocation and output are logged.
 
 ### Mod Settings (Runtime-Global)
 - `hivemind_attack_event_retention_ticks`: Number of ticks to retain attack events (default: 36000, i.e., 10 minutes at 60 UPS)
+- `hivemind_chat_message_retention_ticks`: Number of ticks to retain chat messages (default: 36000)
 - `hivemind_enable_logging`: Enables or disables verbose logging of event and command activity
 - These settings can be changed in the mod settings GUI at runtime.
-
----
-
-## Chat Message Storage & Remote Interface
-
-### Chat Message Storage
-- **Event Type:** The mod tracks and stores all chat messages sent in-game (from `on_console_chat`).
-- **Storage:** Messages are stored in `storage.chat_messages` as a table keyed by game tick. Each message contains:
-  - `tick`: Game tick when the message was sent
-  - `player`: Player name (if available)
-  - `player_index`: Player index (if available)
-  - `message`: The chat message
-  - `event_name`: The event ID (`defines.events.on_console_chat`)
-- **Retention/Pruning:**
-  - Old messages are pruned automatically when new messages are stored.
-  - The retention window (in ticks) is configurable via mod settings (`hivemind_chat_message_retention_ticks`).
-  - Pruning ensures memory usage remains bounded.
-
-### Remote Interface
-- The following remote interface functions are available for chat messages:
-  - `get_chat_messages_after(tick)`: Returns all chat messages after the given tick as a JSON string, bucketed by tick. Results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
-  - `clear_chat_messages()`: Clears all stored chat messages. Returns and prints a JSON status string to RCON.
-- **Usage Example (RCON/Console):**
-  ```
-  /c remote.call("hivemind", "get_chat_messages_after", 1000)
-  /c remote.call("hivemind", "clear_chat_messages")
-  ```
-- **Retention Setting:**
-  - `hivemind_chat_message_retention_ticks`: Number of ticks to retain chat messages (default: 36000, i.e., 10 minutes at 60 UPS)
-- **Localization:**
-  - Setting and description are localized in `locale/en/config.cfg`.
 
 ---
 
@@ -169,21 +156,24 @@ end
 ### Remote Interface: `hivemind`
 - The mod defines a remote interface named `hivemind` (see `modules/remote_interface.lua`).
 - **Registration:** The interface is registered at the top-level of `control.lua` to guarantee availability for RCON, console, and other mods, per Factorio 2.0+ requirements.
-- **Exposed Functions:**
-  - `get_attack_events_after(tick)`: Returns all attack events after the given tick as a JSON string. Results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
-  - `get_storage_snapshot()`: Returns a snapshot of all storage tables (currently just attack events) as a JSON string. Results are logged, serialized, and sent to RCON.
-  - `get_chat_messages_after(tick)`: Returns all chat messages after the given tick as a JSON string. Results are logged, serialized, and sent to RCON.
-  - `clear_chat_messages()`: Clears all stored chat messages. Returns and prints a JSON status string to RCON.
+- **Functions:**
+  - `get_attack_events_after(tick)`: Returns all attack events after the given tick as a JSON string, bucketed by tick.
+  - `get_chat_messages_after(tick)`: Returns all chat messages after the given tick as a JSON string, bucketed by tick.
+  - `clear_attack_events()`: Clears all stored attack events.
+  - `clear_chat_messages()`: Clears all stored chat messages.
+  - All results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
 - **Usage Example (RCON/Console):**
   ```
   /c remote.call("hivemind", "get_attack_events_after", 1000)
-  /c remote.call("hivemind", "get_storage_snapshot")
   /c remote.call("hivemind", "get_chat_messages_after", 1000)
+  /c remote.call("hivemind", "clear_attack_events")
   /c remote.call("hivemind", "clear_chat_messages")
   ```
-- **helpers Usage:** Always use the global `helpers.table_to_json` for serialization. Never require or import helpers; it is a global provided by Factorio 2.0+.
-- **RCON Data Transport:** All remote interface functions print their JSON result to RCON using `rcon.print`. This is the only supported use case; the returned value is always a JSON string for machine consumption.
-- **Security:** Only expose minimal, non-destructive state via remote. Log all remote calls for traceability.
+- **Retention Settings:**
+  - `hivemind_attack_event_retention_ticks`: Number of ticks to retain attack events (default: 36000)
+  - `hivemind_chat_message_retention_ticks`: Number of ticks to retain chat messages (default: 36000)
+- **Localization:**
+  - Settings and descriptions are localized in `locale/en/config.cfg`.
 
 ---
 

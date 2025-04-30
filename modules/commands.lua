@@ -45,33 +45,70 @@ function commands_module.register()
   local command_defs = {
     {
       name = "hm_get_events",
-      desc = "Get attack events after a tick.",
+      desc = "Get a summary of all stored events after a tick (by type).",
       admin_only = true,
       handler = function(cmd)
         local tick = tonumber(cmd.parameter) or 0
         local events = storage.get_events_after(tick)
-        local json = helpers.table_to_json(events)
+        local chat_messages = storage.get_chat_messages_after and storage.get_chat_messages_after(tick) or {}
+        -- Use event_id_to_name for readable names
+        local counts = {}
+        -- Summarize attack events
+        for _, bucket in pairs(events) do
+          for _, event in ipairs(bucket) do
+            local name = event.event_name
+            if name then
+              -- Convert numeric event name to string if needed
+              if type(name) == "number" and event_id_to_name[name] then
+                name = event_id_to_name[name]
+              end
+              counts[name] = (counts[name] or 0) + 1
+            else
+              counts["unknown"] = (counts["unknown"] or 0) + 1
+            end
+          end
+        end
+        -- Summarize chat messages (if any)
+        if chat_messages and type(chat_messages) == "table" then
+          local chat_count = 0
+          for _, bucket in pairs(chat_messages) do
+            chat_count = chat_count + #bucket
+          end
+          if chat_count > 0 then
+            counts["on_console_chat"] = chat_count
+          end
+        end
+        local lines = {"[Hivemind] Event summary after tick " .. tick .. ":"}
+        local event_count = 0
+        for event_name, count in pairs(counts) do
+          table.insert(lines, "- " .. event_name .. ": " .. count)
+          event_count = event_count + count
+        end
+        if event_count == 0 then
+          lines = {"[Hivemind] No events stored after tick " .. tick .. "."}
+        end
+        local output = table.concat(lines, "\n")
         logging.info("/hm_get_events called by " .. (cmd.player_index and ("player " .. cmd.player_index) or "server") .. ", tick=" .. tick)
-        logging.info("/hm_get_events data returned: " .. json)
+        logging.info("/hm_get_events summary returned: " .. output)
         if cmd.player_index then
-          game.players[cmd.player_index].print(json)
+          game.players[cmd.player_index].print(output)
         else
-          game.print(json)
+          game.print(output)
         end
       end
     },
     {
       name = "hm_drop_events",
-      desc = "Delete all stored attack events (debug only)",
+      desc = "Delete all stored events (debug only)",
       admin_only = true,
       handler = function(cmd)
         storage.clear_events()
         logging.info("/hm_drop_events called by " .. (cmd.player_index and ("player " .. cmd.player_index) or "server"))
-        logging.info("All attack event data dropped via /hm_drop_events command")
+        logging.info("All event data dropped via /hm_drop_events command")
         if cmd.player_index then
-          game.players[cmd.player_index].print("All attack event data dropped.")
+          game.players[cmd.player_index].print("All event data dropped.")
         else
-          game.print("All attack event data dropped.")
+          game.print("All event data dropped.")
         end
       end
     },
