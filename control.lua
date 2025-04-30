@@ -5,6 +5,8 @@ local storage = require("modules.storage")
 local event_listener = require("modules.event_listener")
 local commands_module = require("modules.commands")
 local logging = require("modules.logging")
+local remote_interface = require("modules.remote_interface")
+remote_interface.register()  -- Ensure remote interface is registered at load time
 
 --- Initialize all modules and register event handlers/commands
 --  SAFE: Only call from server-only hooks (on_init, on_configuration_changed)

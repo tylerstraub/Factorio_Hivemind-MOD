@@ -51,6 +51,7 @@ end
   - All persistent state is stored directly in the Factorio 2.0+ `storage` table (never `global`, which is undefined in Factorio 2.0+).
   - Storage helpers (see `modules/storage.lua`) encapsulate all access and mutation, referencing the `storage` table directly. This ensures multiplayer and dedicated server safety.
   - **Do not mutate persistent state in `on_load`.** All initialization and mutation occurs in `on_init`, `on_configuration_changed`, or event handlers, per Factorio best practices.
+  - **Do not require or import the `helpers` module.** Use the global `helpers` object provided by Factorio for all serialization (e.g., `helpers.table_to_json`).
 - **Dynamic Configuration:**
   - All runtime-global settings (e.g., event retention) are read live from `settings.global`.
   - Never cache settings; always re-read to support live tuning.
@@ -70,6 +71,7 @@ end
 - **modules/event_listener.lua**: Registers and handles relevant game events (e.g., enemy group attack decisions). Prunes old events and logs new ones.
 - **modules/commands.lua**: Registers and implements custom commands for data export and management.
 - **modules/logging.lua**: Centralized logging utility, controlled by a runtime setting.
+- **modules/remote_interface.lua**: Centralized registration of the `hivemind` remote interface. Exposes storage and event data for RCON, console, and inter-mod access. All exported remote functions are logged, and all data serialization uses the global `helpers.table_to_json` (never require or import helpers).
 - **settings.lua**: Declares all runtime-global settings for logging and retention.
 - **locale/en/config.cfg**: Localization for settings and UI.
 
@@ -128,6 +130,27 @@ end
 - `hivemind_event_retention_ticks`: Number of ticks to retain attack events (default: 36000, i.e., 10 minutes at 60 UPS)
 - `hivemind_enable_logging`: Enables or disables verbose logging of event and command activity
 - These settings can be changed in the mod settings GUI at runtime.
+
+---
+
+## Remote Interfaces & RCON Access
+
+### Remote Interface: `hivemind`
+- The mod defines a remote interface named `hivemind` (see `modules/remote_interface.lua`).
+- **Registration:** The interface is registered at the top-level of `control.lua` to guarantee availability for RCON, console, and other mods, per Factorio 2.0+ requirements.
+- **Exposed Functions:**
+  - `get_attack_events_after(tick)`: Returns all attack events after the given tick as a JSON string. Results are logged and serialized with `helpers.table_to_json`, and sent to RCON with `rcon.print`.
+  - `clear_attack_events()`: Clears all stored attack events. Returns and prints a JSON status string to RCON.
+  - `get_storage_snapshot()`: Returns a snapshot of all storage tables (currently just attack events) as a JSON string. Results are logged, serialized, and sent to RCON.
+- **Usage Example (RCON/Console):**
+  ```
+  /c remote.call("hivemind", "get_attack_events_after", 1000)
+  /c remote.call("hivemind", "clear_attack_events")
+  /c remote.call("hivemind", "get_storage_snapshot")
+  ```
+- **helpers Usage:** Always use the global `helpers.table_to_json` for serialization. Never require or import helpers; it is a global provided by Factorio 2.0+.
+- **RCON Data Transport:** All remote interface functions print their JSON result to RCON using `rcon.print`. This is the only supported use case; the returned value is always a JSON string for machine consumption.
+- **Security:** Only expose minimal, non-destructive state via remote. Log all remote calls for traceability.
 
 ---
 
